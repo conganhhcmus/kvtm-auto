@@ -1,0 +1,52 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: kvtm-auto-backend
+    ports:
+      - "8000:8000"
+      - "5037:5037"  # ADB server port
+    environment:
+      - PYTHONPATH=/app
+      - LOG_LEVEL=INFO
+      - ADB_SERVER_SOCKET=tcp:host.docker.internal:5037
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - kvtm-network
+    volumes:
+      - ./backend/scripts:/app/scripts
+      - ./backend/logs:/app/logs
+      - ./backend/data:/app/data
+      # Mount USB devices for ADB access
+      - /dev/bus/usb:/dev/bus/usb
+    privileged: true  # Required for USB device access
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: kvtm-auto-frontend
+    ports:
+      - "3000:80"
+    environment:
+      - VITE_API_URL=http://localhost:8000/api
+    depends_on:
+      - backend
+    networks:
+      - kvtm-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+networks:
+  kvtm-network:
+    driver: bridge

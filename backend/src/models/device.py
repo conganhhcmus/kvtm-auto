@@ -1,0 +1,87 @@
+"""Device models for KVTM Auto Backend."""
+
+from enum import Enum
+from typing import Optional, Tuple
+
+from pydantic import BaseModel, Field
+
+
+class DeviceStatus(Enum):
+    """Device status."""
+
+    AVAILABLE = "available"
+    RUNNING = "running"
+
+
+class DeviceScriptState(Enum):
+    """Device script execution state."""
+
+    IDLE = "idle"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class Device(BaseModel):
+    """Comprehensive device model for API responses and script parameters."""
+
+    device_id: str = Field(alias="id", description="Unique device identifier")
+    device_name: str = Field(description="Device display name")
+    device_status: str = Field(
+        default=DeviceStatus.AVAILABLE.value, description="Current device status"
+    )
+    device_running_id: Optional[str] = Field(
+        default=None, description="Execution ID when script is running"
+    )
+
+    # Additional fields for API and database compatibility
+    screen_size: Optional[Tuple[int, int]] = Field(
+        default=None, description="Device screen dimensions"
+    )
+    last_seen: Optional[str] = Field(default=None, description="Last seen timestamp")
+    current_script: Optional[str] = Field(
+        default=None, description="Currently running script ID"
+    )
+
+    class Config:
+        allow_population_by_field_name = True
+
+    def __init__(self, **data):
+        # Auto-generate device_name from device_id if not provided
+        if "device_name" not in data and ("id" in data or "device_id" in data):
+            device_id = data.get("id") or data.get("device_id")
+            data["device_name"] = f"Device {device_id}"
+        super().__init__(**data)
+
+    @property
+    def id(self) -> str:
+        """Backward compatibility property."""
+        return self.device_id
+
+    @property
+    def name(self) -> str:
+        """Backward compatibility property."""
+        return self.device_name
+
+    @property
+    def status(self) -> str:
+        """Backward compatibility property."""
+        return self.device_status
+
+    def is_running(self) -> bool:
+        """Check if device is currently running a script."""
+        return self.device_running_id is not None
+
+    def set_running(self, execution_id: str) -> None:
+        """Set device as running with execution ID."""
+        self.device_running_id = execution_id
+        self.device_status = DeviceStatus.RUNNING.value
+
+    def set_available(self) -> None:
+        """Set device as available and clear running ID."""
+        self.device_running_id = None
+        self.device_status = DeviceStatus.AVAILABLE.value
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for database storage."""
+        return self.model_dump(by_alias=True, exclude_none=True)

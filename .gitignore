@@ -1,0 +1,117 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Production builds
+dist/
+build/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# Poetry
+poetry.lock
+
+# FastAPI/Uvicorn
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Docker
+.dockerignore
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+
+# Application specific
+data/
+screenshots/
+device_info_*.json
+script_results/
+
+# Android SDK (if included)
+android-sdk/
+platform-tools/
+
+# ADB
+adb.log
+adb_usb.ini
+
+# Test coverage
+.nyc_output/
+coverage/
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Local configuration
+config.local.json
+settings.local.json
+
+# Certificate files
+*.pem
+*.key
+*.crt
+
+# Archives
+*.tar.gz
+*.zip
+*.rar
+*.7z
