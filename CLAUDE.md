@@ -39,21 +39,33 @@ docker-compose logs frontend  # View frontend logs
 ### Backend Structure (`backend/src/`)
 - **main.py**: FastAPI application entry point with CORS, global exception handling, and lifespan management
 - **api/**: REST API endpoints
-  - **devices.py**: Device management, script execution, device logs
+  - **devices.py**: Device management, connection/disconnection, device info
   - **scripts.py**: Script discovery and metadata from filesystem
+  - **execute.py**: Script execution endpoints and status management
 - **core/**: Core business logic
   - **adb.py**: Android Debug Bridge wrapper for device control (tap, swipe, screenshots, app management)
   - **executor.py**: Multi-threaded script execution system with per-device isolation
   - **database.py**: In-memory database for device state and logging
   - **image.py**: Image processing utilities for device screenshots
-  - **logger.py**: Centralized logging setup using Loguru
-- **models/**: Data models for Device, GameOptions, and device states
+- **models/**: Data models and type definitions
+  - **device.py**: Device, DeviceStatus, DeviceScriptState models
+  - **script.py**: Script metadata and GameOptions models
+- **scripts/**: Automation scripts directory (example_script.py, open_game.py)
+- **data/**: JSON data storage (devices.json, logs.json, scripts.json)
+- **logs/**: Application log files
+- **test/**: Test suite directory
 
 ### Frontend Structure (`frontend/src/`)
 - **App.tsx**: Main application component with device management UI
 - **api.ts**: Axios-based API client with interceptors for backend communication
 - **components/**: React components for modals and UI elements
-- Built with Vite + React 18 + TypeScript + Tailwind CSS + React Query
+  - **DeviceDetailModal.tsx**: Comprehensive device information display
+  - **Modal.tsx**: Base modal component for overlays
+  - **MultiSelect.tsx**: Multi-selection dropdown component
+  - **SearchableSelect.tsx**: Searchable dropdown component
+- **main.tsx**: Application entry point with React 18 and TanStack Query setup
+- **index.css**: Global styles with Tailwind CSS imports
+- Built with Vite 7.1.2 + React 18.2 + TypeScript 5+ + Tailwind CSS 3.3 + TanStack Query v4.24.6
 
 ### Script System
 - Scripts are Python files in `backend/scripts/` with required metadata:
@@ -66,8 +78,8 @@ docker-compose logs frontend  # View frontend logs
       "description": "What this script does"
   }
   
-  def run_script(device_info, game_options, stop_flag):
-      # Script implementation
+  def run_script(device: Device, game_options: GameOptions, context):
+      # Script implementation with proper typing
       return {"success": True, "message": "Completed"}
   ```
 
@@ -79,10 +91,13 @@ docker-compose logs frontend  # View frontend logs
 
 ### Key Integrations
 - **ADB**: Direct subprocess calls to Android Debug Bridge
-- **UIAutomator2/ADBUtils**: Android automation libraries
-- **OpenCV/Pillow**: Image processing for screenshots
-- **FastAPI**: Async web framework with automatic OpenAPI docs
-- **TanStack Query**: Frontend state management and API caching
+- **OpenCV/NumPy**: Image processing for screenshots and image analysis (v4.8.1, v1.24.4)
+- **FastAPI**: Async web framework v0.104.1 with automatic OpenAPI docs at `/docs`
+- **TanStack Query v4.24.6**: Frontend state management and API caching
+- **Loguru v0.7.2**: Structured logging throughout backend
+- **Vite 7.1.2**: Fast development and build tooling for frontend
+- **Lucide React v0.263.1**: Modern icon system for UI components
+- **Axios v1.3.4**: HTTP client with request/response interceptors
 
 ## Development Workflow
 
@@ -96,11 +111,40 @@ docker-compose logs frontend  # View frontend logs
 
 - Backend starts on port 8000 with health check at `/health`
 - Frontend served on port 3000 (development) or 80 (Docker)
-- API endpoints prefixed with `/api/` (devices, scripts routes)
+- API endpoints prefixed with `/api/` (devices, scripts, execute routes)
 - Docker containers communicate via `kvtm-network` bridge
-- USB devices mounted as volumes for ADB access in Docker
+- USB devices mounted as volumes (`/dev/bus/usb`) for ADB access in Docker
+- Backend container runs in privileged mode for USB device access
 - Loguru used for structured logging throughout backend
-- TanStack Query handles API caching and real-time updates
+- TanStack Query v4 handles API caching and real-time updates
 - Script execution isolated per device using threading with stop flags
-- The application is running by docker compose. Any change need to build and restart service in docker compose
-- use browsermcp to get error console log, network, ... in browser
+- The frontend and backend run via docker compose. Any changes require rebuilding and restarting services
+- Use browser MCP tools to get console logs, network requests, etc. when debugging frontend
+- Do not run frontend with `npm run dev` - always use docker-compose and visit localhost:3000
+- API documentation available at http://localhost:8000/docs when backend is running
+
+## Testing & Quality Assurance
+
+### Backend Testing
+```bash
+cd backend
+poetry run pytest                        # Run all tests
+poetry run pytest test/ -v               # Run with verbose output
+poetry run pytest --cov=src test/        # Run with coverage report
+```
+
+### Code Quality Commands (run these before commits)
+```bash
+# Backend
+cd backend
+poetry run black src/                    # Format code
+poetry run isort src/                    # Sort imports
+poetry run flake8 src/                   # Lint code
+poetry run mypy src/                     # Type checking
+
+# Frontend  
+cd frontend
+npm run lint                             # ESLint check
+npm run format                           # Fix ESLint issues
+npm run build                            # Verify build works
+```

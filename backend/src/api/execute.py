@@ -3,7 +3,6 @@ Execute API endpoints for KVTM Auto
 Handles script execution operations (start/stop)
 """
 
-import uuid
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
@@ -25,7 +24,6 @@ class StartRequest(BaseModel):
 
 class StartResponse(BaseModel):
     """Start script execution response"""
-    execution_id: str
     message: str
 
 
@@ -45,7 +43,6 @@ class StatusResponse(BaseModel):
     device_id: str
     status: str
     script_id: Optional[str] = None
-    execution_id: Optional[str] = None
 
 
 @router.post("/start", response_model=StartResponse)
@@ -64,25 +61,22 @@ async def start_script(request: StartRequest, background_tasks: BackgroundTasks)
         if device.current_script:
             raise HTTPException(status_code=400, detail="Device is already running a script")
 
-        # Check if script exists
-        script = db.get_script_by_id(request.script_id)
-        if not script:
+        # Check if script exists in database
+        if not db.script_exists(request.script_id):
             raise HTTPException(status_code=404, detail="Script not found")
 
         # Always use hardcoded values for max_loops and loop_delay
         game_options = request.game_options or GameOptions()
         game_options.max_loops = 1000  # Hardcoded max
         game_options.loop_delay = 1.0  # Hardcoded delay
-        execution_id = str(uuid.uuid4())
 
         # Set device script
         db.set_device_script(
             device_id=request.device_id,
             script_id=request.script_id,
-            execution_id=execution_id,
         )
 
-        logger.info(f"Starting script {request.script_id} on device {request.device_id} with execution_id {execution_id}")
+        logger.info(f"Starting script {request.script_id} on device {request.device_id}")
 
         # Execute script in background
         background_tasks.add_task(
@@ -93,7 +87,6 @@ async def start_script(request: StartRequest, background_tasks: BackgroundTasks)
         )
 
         return StartResponse(
-            execution_id=execution_id,
             message=f"Script {request.script_id} started on device {request.device_id}",
         )
 
@@ -147,14 +140,12 @@ async def get_execution_status(device_id: str):
                 device_id=device_id,
                 status="idle",
                 script_id=None,
-                execution_id=None
             )
             
         return StatusResponse(
             device_id=device_id,
             status="running",
             script_id=device.current_script,
-            execution_id=device.device_running_id
         )
 
     except HTTPException:

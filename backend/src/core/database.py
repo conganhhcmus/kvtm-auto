@@ -69,55 +69,19 @@ class Database:
         except Exception as e:
             logger.error(f"Failed to save scripts data: {e}")
 
-    def get_all_scripts(self) -> List[Script]:
-        """Get all scripts metadata as Script models"""
+    def get_scripts_data(self) -> List[Dict[str, Any]]:
+        """Get raw scripts data from JSON file"""
         scripts_raw = self._load_scripts()
         
         # Handle both flat array and wrapped object format
         if isinstance(scripts_raw, dict) and "scripts" in scripts_raw:
-            scripts_data = scripts_raw["scripts"]
+            return scripts_raw["scripts"]
         else:
-            scripts_data = scripts_raw
-            
-        scripts = []
-        
-        for script_meta in scripts_data:
-            try:
-                # Simple script model with only required fields
-                script_dict = {
-                    "id": script_meta.get("id", ""),
-                    "name": script_meta.get("name", ""),
-                    "description": script_meta.get("description"),
-                    "order": script_meta.get("order", 0),
-                    "recommend": script_meta.get("recommend", False),
-                }
-                script = Script(**script_dict)
-                scripts.append(script)
-            except Exception as e:
-                logger.error(f"Failed to parse script metadata {script_meta.get('id', 'unknown')}: {e}")
-                continue
-        
-        return scripts
+            return scripts_raw
 
-    def get_script_by_id(self, script_id: str) -> Optional[Script]:
-        """Get specific script metadata by ID as Script model"""
-        scripts = self.get_all_scripts()
-        for script in scripts:
-            if script.id == script_id:
-                return script
-        return None
-
-    def get_script_path(self, script_id: str) -> Path:
-        """Get the file path for a script"""
-        # Simple approach: script filename = script_id + .py
-        backend_dir = self.data_dir.parent
-        scripts_dir = backend_dir / "scripts"
-        script_path = scripts_dir / f"{script_id}.py"
-        
-        if not script_path.exists():
-            raise FileNotFoundError(f"Script file not found: {script_path}")
-            
-        return script_path
+    def save_scripts_data(self, scripts_data: List[Dict[str, Any]]) -> None:
+        """Save raw scripts data to JSON file"""
+        self._save_scripts(scripts_data)
 
     def get_all_devices(self) -> List[Device]:
         """Get all devices as Device models"""
@@ -126,11 +90,16 @@ class Database:
         
         for device_data in devices_data:
             try:
+                if not isinstance(device_data, dict):
+                    logger.warning(f"Skipping invalid device data (not dict): {device_data}")
+                    continue
+                    
                 device = Device(**device_data)
                 devices.append(device)
             except Exception as e:
-                device_id = device_data.get('id', 'unknown')
+                device_id = device_data.get('id', 'unknown') if isinstance(device_data, dict) else 'unknown'
                 logger.error(f"Failed to parse device data for {device_id}: {e}")
+                logger.debug(f"Device data: {device_data}")
                 continue
         
         return devices
@@ -178,13 +147,11 @@ class Database:
         self,
         device_id: str,
         script_id: str,
-        execution_id: str,
     ) -> None:
         """Set device current script"""
         device = self.get_device(device_id)
         if device:
             device.current_script = script_id
-            device.device_running_id = execution_id
             device.device_status = DeviceStatus.RUNNING.value
             self.save_device(device)
 
@@ -194,7 +161,6 @@ class Database:
         if device and device.current_script:
             # Clear current script and set device as available
             device.current_script = None
-            device.device_running_id = None
             device.device_status = DeviceStatus.AVAILABLE.value
             self.save_device(device)
 
@@ -265,6 +231,74 @@ class Database:
                 
         except Exception as e:
             logger.error(f"Failed to clear logs for device {device_id}: {e}")
+
+    def get_all_scripts(self) -> List[Script]:
+        """Get all scripts as Script models"""
+        scripts_data = self._load_scripts()
+        scripts = []
+        
+        for script_data in scripts_data:
+            try:
+                if not isinstance(script_data, dict):
+                    logger.warning(f"Skipping invalid script data (not dict): {script_data}")
+                    continue
+                    
+                script = Script(**script_data)
+                scripts.append(script)
+            except Exception as e:
+                script_id = script_data.get('id', 'unknown') if isinstance(script_data, dict) else 'unknown'
+                logger.error(f"Failed to parse script data for {script_id}: {e}")
+                logger.debug(f"Script data: {script_data}")
+                continue
+        
+        return scripts
+
+    def get_script(self, script_id: str) -> Optional[Script]:
+        """Get specific script as Script model"""
+        scripts_data = self._load_scripts()
+        for script_data in scripts_data:
+            if script_data.get("id") == script_id:
+                try:
+                    return Script(**script_data)
+                except Exception as e:
+                    logger.error(f"Failed to parse script data for {script_id}: {e}")
+                    return None
+        return None
+
+    def save_script(self, script: Script) -> None:
+        """Save Script model to JSON file"""
+        scripts_data = self._load_scripts()
+        script_dict = script.model_dump()
+        script_dict["last_updated"] = datetime.now().isoformat()
+        
+        # Find existing script or create new one
+        script_found = False
+        for i, existing_script in enumerate(scripts_data):
+            if existing_script.get("id") == script.id:
+                scripts_data[i] = script_dict
+                script_found = True
+                break
+        
+        if not script_found:
+            scripts_data.append(script_dict)
+        
+        self._save_scripts(scripts_data)
+        logger.info(f"Script {script.id} saved successfully")
+
+    def save_scripts(self, scripts: List[Script]) -> None:
+        """Save multiple Script models to JSON file"""
+        scripts_data = []
+        for script in scripts:
+            script_dict = script.model_dump()
+            script_dict["last_updated"] = datetime.now().isoformat()
+            scripts_data.append(script_dict)
+        
+        self._save_scripts(scripts_data)
+        logger.info(f"Saved {len(scripts)} scripts to database")
+
+    def script_exists(self, script_id: str) -> bool:
+        """Check if script exists in database"""
+        return self.get_script(script_id) is not None
 
 
 

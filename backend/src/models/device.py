@@ -13,15 +13,6 @@ class DeviceStatus(Enum):
     RUNNING = "running"
 
 
-class DeviceScriptState(Enum):
-    """Device script execution state."""
-
-    IDLE = "idle"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
-
-
 class Device(BaseModel):
     """Comprehensive device model for API responses and script parameters."""
 
@@ -29,9 +20,6 @@ class Device(BaseModel):
     device_name: str = Field(description="Device display name")
     device_status: str = Field(
         default=DeviceStatus.AVAILABLE.value, description="Current device status"
-    )
-    device_running_id: Optional[str] = Field(
-        default=None, description="Execution ID when script is running"
     )
 
     # Additional fields for API and database compatibility
@@ -44,7 +32,7 @@ class Device(BaseModel):
     )
 
     class Config:
-        allow_population_by_field_name = True
+        populate_by_name = True
 
     def __init__(self, **data):
         # Auto-generate device_name from device_id if not provided
@@ -67,20 +55,6 @@ class Device(BaseModel):
     def status(self) -> str:
         """Backward compatibility property."""
         return self.device_status
-
-    def is_running(self) -> bool:
-        """Check if device is currently running a script."""
-        return self.device_running_id is not None
-
-    def set_running(self, execution_id: str) -> None:
-        """Set device as running with execution ID."""
-        self.device_running_id = execution_id
-        self.device_status = DeviceStatus.RUNNING.value
-
-    def set_available(self) -> None:
-        """Set device as available and clear running ID."""
-        self.device_running_id = None
-        self.device_status = DeviceStatus.AVAILABLE.value
 
     def to_dict(self) -> dict:
         """Convert to dictionary for database storage."""

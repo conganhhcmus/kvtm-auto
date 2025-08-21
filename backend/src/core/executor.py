@@ -8,12 +8,13 @@ import multiprocessing
 import time
 import traceback
 from pathlib import Path
-from typing import Any, Dict
+from typing import Dict
 
 from loguru import logger
 
 from ..models import GameOptions, Device
 from . import adb, image, db
+from .script import script_manager
 
 
 
@@ -140,7 +141,9 @@ class Executor:
                 db.write_log(device_id, "Running open-game script...")
 
                 # Load and execute open-game script
-                script_path = db.get_script_path("open_game")
+                script_path = script_manager.get_script_path("open_game")
+                if not script_path:
+                    raise FileNotFoundError("open_game script not found")
                 script_module = self._load_script_module(script_path)
 
                 if not hasattr(script_module, "main"):
@@ -163,7 +166,9 @@ class Executor:
             db.write_log(device_id, f"Loading script {script_id}...")
 
             # Load main script
-            script_path = db.get_script_path(script_id)
+            script_path = script_manager.get_script_path(script_id)
+            if not script_path:
+                raise FileNotFoundError(f"Script {script_id} not found")
             script_module = self._load_script_module(script_path)
 
             if not hasattr(script_module, "main"):
@@ -230,6 +235,10 @@ class Executor:
             # Inject required modules into script namespace
             module.adb = adb
             module.image = image
+            module.db = db
+            
+            # Inject scripts core module for shared utilities
+            self._inject_scripts_core_module(module)
 
             spec.loader.exec_module(module)
             return module
@@ -237,6 +246,42 @@ class Executor:
         except Exception as e:
             logger.error(f"Failed to load script module {script_path}: {e}")
             raise
+
+    def _inject_scripts_core_module(self, module):
+        """Inject the scripts core module for shared utilities"""
+        try:
+            # Get the scripts directory
+            current_dir = Path(__file__).parent
+            backend_dir = current_dir.parent.parent
+            scripts_dir = backend_dir / "scripts"
+            core_script_path = scripts_dir / "_core.py"
+            
+            if core_script_path.exists():
+                # Load the scripts core module
+                spec = importlib.util.spec_from_file_location("scripts_core", core_script_path)
+                if spec is not None and spec.loader is not None:
+                    core_module = importlib.util.module_from_spec(spec)
+                    
+                    # Inject dependencies into core module first
+                    core_module.adb = adb
+                    core_module.image = image
+                    core_module.db = db
+                    
+                    # Execute the core module
+                    spec.loader.exec_module(core_module)
+                    
+                    # Inject core module into script
+                    module.core = core_module
+                    
+                    logger.debug("Successfully injected scripts core module")
+                else:
+                    logger.warning("Could not create spec for scripts core module")
+            else:
+                logger.debug("Scripts core module not found, skipping injection")
+                
+        except Exception as e:
+            logger.error(f"Failed to inject scripts core module: {e}")
+            # Don't raise - this is optional functionality
 
     def _prepare_device_info(self, device_id: str) -> Device:
         """Prepare device information for script"""
@@ -267,7 +312,7 @@ class Executor:
     def _handle_script_error(self, device_id: str, script_id: str, error_msg: str):
         """Handle script execution errors"""
         try:
-            db.write_log(device_id, f"ERROR: {error_msg}", "ERROR")
+            db.write_log(device_id, f"ERROR: {script_id} has error: {error_msg}", "ERROR")
 
             # Update device state to stop script
             db.stop_device_script(device_id)

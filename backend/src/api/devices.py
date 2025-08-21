@@ -33,7 +33,12 @@ async def get_all_devices():
         existing_devices = db.get_all_devices()
         
         connected_device_set = set(connected_device_ids)
-        existing_device_map = {device.device_id: device for device in existing_devices}
+        existing_device_map = {}
+        for device in existing_devices:
+            if isinstance(device, Device):
+                existing_device_map[device.device_id] = device
+            else:
+                logger.warning(f"Skipping invalid device object: {device}")
         
         current_time = datetime.now().isoformat()
         devices_to_save = []
@@ -68,7 +73,7 @@ async def get_all_devices():
                 devices_to_save.append(new_device)
 
         for device in existing_devices:
-            if device.device_id not in connected_device_set:
+            if isinstance(device, Device) and device.device_id not in connected_device_set:
                 device.device_status = DeviceStatus.AVAILABLE.value
                 devices_to_save.append(device)
 

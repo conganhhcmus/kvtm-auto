@@ -1,19 +1,19 @@
 # KVTM Auto - Android Device Automation Platform
 
-A comprehensive full-stack application for automating Android devices using ADB (Android Debug Bridge). Built with a modern React + TypeScript frontend (Vite/Tailwind) and Python FastAPI backend with advanced Android automation capabilities.
+A comprehensive full-stack application for automating Android devices using ADB (Android Debug Bridge). Built with a modern React + TypeScript frontend and Python FastAPI backend with advanced Android automation capabilities.
 
 ## Features
 
 ### 🤖 Device Management
 - Automatic device discovery via ADB
 - Real-time device status monitoring
-- USB and network device support
+- USB device support with privileged Docker access
 - Device connection/disconnection management
 - Device details and specifications display
 
 ### 📝 Script Management
 - Custom automation script execution with metadata
-- Multi-device parallel execution
+- Multi-device parallel execution with threading isolation
 - Real-time progress tracking
 - Script execution history and status
 - Integrated ADB command execution
@@ -27,7 +27,7 @@ A comprehensive full-stack application for automating Android devices using ADB 
 
 ### 🎛️ Web Interface
 - Modern React-based UI with Vite and Tailwind CSS
-- Real-time updates with TanStack Query (React Query)
+- Real-time updates with TanStack Query (React Query v4)
 - Responsive device management dashboard
 - Interactive script execution controls
 - Modal-based device details and logs
@@ -36,13 +36,14 @@ A comprehensive full-stack application for automating Android devices using ADB 
 - Game options panel with checkboxes for automation features
 
 ### 🔧 Technology Stack
-- **Backend**: FastAPI, Python 3.9+, ADB Utils, UIAutomator2
-- **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, TanStack Query, Lucide React
-- **Containerization**: Docker with USB device access
-- **Image Processing**: OpenCV, Pillow for device screenshots
-- **Build Tools**: Vite for fast development and optimized production builds
-- **Styling**: Tailwind CSS for utility-first styling with custom theme
-- **HTTP Client**: Axios with request/response interceptors
+- **Backend**: FastAPI 0.104.1, Python 3.9+, Loguru 0.7.2, OpenCV 4.8.1, NumPy 1.24.4
+- **Frontend**: React 18.2, TypeScript 5+, Vite 7.1.2, Tailwind CSS 3.3, TanStack Query v4.24.6, Lucide React 0.263.1
+- **Containerization**: Docker with privileged mode for USB device access
+- **Image Processing**: OpenCV, NumPy for device screenshots and image analysis
+- **Build Tools**: Vite 7.1.2 for fast development and optimized production builds
+- **Styling**: Tailwind CSS 3.3 for utility-first styling with PostCSS 8.4.21 and Autoprefixer 10.4.14
+- **HTTP Client**: Axios 1.3.4 with request/response interceptors
+- **Code Quality**: Black, isort, flake8, mypy for Python; ESLint, TypeScript for frontend
 
 ## Architecture
 
@@ -165,22 +166,25 @@ def run_script(device: Device, game_options: GameOptions, context):
 The backend provides a RESTful API with the following endpoints:
 
 ### Devices
-- `GET /devices` - List all devices
-- `GET /devices/{device_id}` - Get device details
-- `POST /devices/refresh` - Refresh device list
-- `POST /devices/{device_id}/connect` - Connect device
-- `POST /devices/{device_id}/disconnect` - Disconnect device
+- `GET /api/devices` - List all devices
+- `GET /api/devices/{device_id}` - Get device details
+- `POST /api/devices/refresh` - Refresh device list
+- `POST /api/devices/{device_id}/connect` - Connect device
+- `POST /api/devices/{device_id}/disconnect` - Disconnect device
 
 ### Scripts
-- `GET /scripts` - List available scripts
-- `GET /scripts/{script_id}` - Get script details
-- `POST /scripts/{script_id}/run` - Execute script
-- `GET /scripts/executions` - List executions
-- `POST /scripts/executions/{execution_id}/stop` - Stop execution
+- `GET /api/scripts` - List available scripts
+- `GET /api/scripts/{script_id}` - Get script details
+
+### Script Execution
+- `POST /api/execute/{script_id}` - Execute script on devices
+- `GET /api/execute/status` - Get execution status
+- `POST /api/execute/stop` - Stop all executions
+- `POST /api/execute/stop/{device_id}` - Stop execution on specific device
 
 ### System
 - `GET /health` - Health check endpoint
-- `GET /logs` - Get system logs (with filtering)
+- `GET /api/logs` - Get system logs (with filtering)
 
 ## Configuration
 
@@ -213,18 +217,33 @@ kvtm-auto/
 ├── frontend/                 # React TypeScript frontend (Vite + Tailwind)
 │   ├── src/
 │   │   ├── components/      # React components
-│   │   ├── api.ts          # API client
-│   │   └── ...
-│   └── ...
+│   │   │   ├── DeviceDetailModal.tsx   # Device information display
+│   │   │   ├── Modal.tsx              # Base modal component
+│   │   │   ├── MultiSelect.tsx        # Multi-selection dropdown
+│   │   │   └── SearchableSelect.tsx   # Searchable dropdown
+│   │   ├── api.ts          # API client with Axios 1.3.4
+│   │   ├── App.tsx         # Main application component
+│   │   ├── main.tsx        # Application entry point
+│   │   └── index.css       # Global styles with Tailwind imports
+│   ├── package.json        # Node.js dependencies
+│   ├── nginx.conf          # Nginx configuration for Docker
+│   └── Dockerfile          # Frontend container build
 ├── backend/                 # Python FastAPI backend
 │   ├── src/
-│   │   ├── api/           # API routes
-│   │   ├── core/          # Core business logic
-│   │   ├── models/        # Data models
-│   │   └── main.py        # Application entry point
-│   ├── scripts/           # Automation scripts
-│   └── pyproject.toml     # Poetry configuration
-└── docker-compose.yml      # Container orchestration
+│   │   ├── api/           # API routes (devices.py, scripts.py, execute.py)
+│   │   ├── core/          # Core business logic (adb.py, executor.py, database.py, image.py)
+│   │   ├── models/        # Data models (device.py, script.py)
+│   │   └── main.py        # FastAPI application entry point
+│   ├── scripts/           # Automation scripts (example_script.py, open_game.py)
+│   ├── data/              # JSON data storage (devices.json, logs.json, scripts.json)
+│   ├── logs/              # Application log files
+│   ├── test/              # Test suite directory
+│   ├── assets/            # Static assets (test.png)
+│   ├── pyproject.toml     # Poetry configuration with dependencies
+│   └── Dockerfile         # Backend container build
+├── docker-compose.yml      # Container orchestration with USB access
+├── CLAUDE.md              # Development guidance for Claude Code
+└── README.md              # Project documentation
 ```
 
 ### Code Quality & Linting
@@ -232,15 +251,17 @@ kvtm-auto/
 ```bash
 # Backend code quality
 cd backend
-poetry run black src/              # Format code
-poetry run isort src/              # Sort imports
-poetry run flake8 src/             # Lint code
-poetry run mypy src/               # Type checking
+poetry run black src/              # Format code (Black 23.11.0)
+poetry run isort src/              # Sort imports (isort 5.12.0)
+poetry run flake8 src/             # Lint code (flake8 6.1.0)
+poetry run mypy src/               # Type checking (mypy 1.7.1)
+poetry run pytest test/            # Run tests (pytest 7.4.3)
 
 # Frontend code quality
 cd frontend
-npm run lint                       # Run ESLint
+npm run lint                       # Run ESLint 8.38.0
 npm run format                     # Fix linting issues
+npm run build                      # TypeScript 5+ compilation check
 ```
 
 ### Frontend Features
@@ -269,10 +290,10 @@ npm run format                     # Fix linting issues
 ### Code Quality
 
 The project includes pre-configured tools for code quality:
-- **Backend**: Black, isort, flake8, mypy for Python code quality
-- **Frontend**: ESLint, TypeScript compiler, React-specific linting
-- **Build Tools**: Vite for fast development and optimized production builds
-- **Styling**: Tailwind CSS with PostCSS and Autoprefixer
+- **Backend**: Black 23.11.0, isort 5.12.0, flake8 6.1.0, mypy 1.7.1, pytest 7.4.3 with asyncio support
+- **Frontend**: ESLint 8.38.0, TypeScript 5.0.2 compiler, React-specific linting rules
+- **Build Tools**: Vite 7.1.2 for fast development and optimized production builds
+- **Styling**: Tailwind CSS 3.3 with PostCSS 8.4.21 and Autoprefixer 10.4.14
 
 ## Contributing
 

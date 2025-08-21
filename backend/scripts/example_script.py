@@ -3,8 +3,17 @@ Example script for KVTM Auto
 This demonstrates how to create a simple script that throws exceptions for error handling
 """
 
+import time
 from src.core import adb, image
 from src.models import Device, GameOptions
+
+SCRIPT_META = {
+    "id": "example_script",
+    "name": "Example Script",
+    "order": 1,
+    "recommend": True,
+    "description": "Example script demonstrating template matching and error handling"
+}
 
 
 def main(device: Device, game_options: GameOptions, loop_index: int = 0):
@@ -36,6 +45,7 @@ def main(device: Device, game_options: GameOptions, loop_index: int = 0):
     
     # Step 4: Click on found coordinates
     adb.tap(x, y, device_id)
+    time.sleep(10)
     
     return {
         "success": True,
