@@ -12,9 +12,6 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Move index.html to root for Vite build
-RUN cp public/index.html ./
-
 # Build the application
 RUN npm run build
 

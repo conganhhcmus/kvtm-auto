@@ -7,6 +7,14 @@ import time
 from src.core import adb, image
 from src.models import Device, GameOptions
 
+SCRIPT_META = {
+    "id": "open_game",
+    "name": "Open Game",
+    "order": 0,
+    "recommend": False,
+    "description": "Opens the game application and verifies it loaded successfully"
+}
+
 def main(device: Device, game_options: GameOptions, loop_index: int = 0):
     """
     Opens the game application on the device
@@ -19,7 +27,7 @@ def main(device: Device, game_options: GameOptions, loop_index: int = 0):
     
     device_id = device.device_id
 
-    game_package = "com.your.game.package"
+    game_package = "vn.kvtm.js"
 
     adb.close_app(game_package, device_id)
 

@@ -4,13 +4,14 @@ Android device automation backend
 """
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from loguru import logger
-from pathlib import Path
+
 from .api import devices, execute, scripts
 
 
@@ -20,7 +21,7 @@ async def lifespan(app: FastAPI):
     # Setup logging
     log_path = Path("logs/application.log")
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    
+
     logger.add(
         log_path,
         format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
@@ -29,7 +30,7 @@ async def lifespan(app: FastAPI):
         retention="30 days",
         compression="zip",
     )
-    
+
     logger.info("Starting KVTM Auto Backend...")
     logger.info("Application startup complete")
 
@@ -85,9 +86,9 @@ async def root():
         "health": "/health",
         "endpoints": {
             "devices": "/api/devices",
-            "scripts": "/api/scripts", 
-            "execute": "/api/execute"
-        }
+            "scripts": "/api/scripts",
+            "execute": "/api/execute",
+        },
     }
 
 

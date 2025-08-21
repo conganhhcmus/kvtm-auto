@@ -46,6 +46,7 @@ api.interceptors.response.use(
 export const deviceApi = {
     getDevices: () => api.get('/devices/'),
     getDevice: (deviceId: string) => api.get(`/devices/${deviceId}`),
+    getDeviceLogs: (deviceId: string, limit?: number) => api.get(`/devices/${deviceId}/logs`, { params: { limit } }),
     connectDevice: (deviceId: string) => api.post(`/devices/${deviceId}/connect`),
     disconnectDevice: (deviceId: string) => api.post(`/devices/${deviceId}/disconnect`),
     refreshDevices: () => api.post('/devices/refresh'),
@@ -64,14 +65,3 @@ export const scriptApi = {
     getScriptExecutions: () => api.get('/scripts/executions'),
 }
 
-// Logs API
-export const logsApi = {
-    getLogs: (params?: { 
-        device_id?: string
-        script_id?: string
-        level?: string
-        limit?: number
-        offset?: number
-    }) => api.get('/logs', { params }),
-    getLogsByExecution: (executionId: string) => api.get(`/logs/execution/${executionId}`),
-}

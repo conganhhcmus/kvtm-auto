@@ -1,31 +1,26 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { deviceApi, scriptApi, GameOptions } from '@/api'
-import { ChevronDown, X, FileText, ChevronUp } from 'lucide-react'
-import DeviceModal from '@/components/DeviceModal'
-import LogsModal from '@/components/LogsModal'
+import { Play, Square, ChevronDown, ChevronUp, MonitorOff, ScrollText } from 'lucide-react'
 import DeviceDetailModal from '@/components/DeviceDetailModal'
+import DeviceLogModal from '@/components/DeviceLogModal'
+import SearchableSelect from '@/components/SearchableSelect'
+import MultiSelect from '@/components/MultiSelect'
 
 interface Device {
     id: string
     device_name: string
     device_status: string
-    device_running_id?: string
     screen_size?: [number, number]
     last_seen?: string
-    current_script?: {
-        script_id: string
-        script_name: string
-        execution_id: string
-        state: string
-        started_at: string
-    }
+    current_script?: string
 }
 
 interface Script {
     id: string
     name: string
     description?: string
+    recommend: boolean
 }
 
 interface ScriptExecution {
@@ -39,17 +34,17 @@ interface ScriptExecution {
 
 function App() {
     const queryClient = useQueryClient()
-    const [selectedDevice, setSelectedDevice] = useState('')
+    const [selectedDevices, setSelectedDevices] = useState<string[]>([])
     const [selectedScript, setSelectedScript] = useState('')
     const [openGame, setOpenGame] = useState(true)
     const [openChests, setOpenChests] = useState(true)
     const [sellItems, setSellItems] = useState(true)
-  
-    const [showDeviceModal, setShowDeviceModal] = useState(false)
-    const [showLogsModal, setShowLogsModal] = useState(false)
+    
     const [showDetailModal, setShowDetailModal] = useState(false)
     const [selectedDeviceDetail, setSelectedDeviceDetail] = useState('')
-    const [showDeviceTable, setShowDeviceTable] = useState(false)
+    const [showLogModal, setShowLogModal] = useState(false)
+    const [selectedDeviceForLogs, setSelectedDeviceForLogs] = useState('')
+    const [isControlPanelExpanded, setIsControlPanelExpanded] = useState(true)
 
     const { data: devices = [] } = useQuery({
         queryKey: ['devices'],
@@ -63,7 +58,7 @@ function App() {
 
     const runMutation = useMutation({
         mutationFn: () => {
-            if (!selectedDevice) throw new Error('No device selected')
+            if (selectedDevices.length === 0) throw new Error('No devices selected')
             if (!selectedScript) throw new Error('No script selected')
             
             const gameOptions: GameOptions = {
@@ -72,7 +67,7 @@ function App() {
                 sell_items: sellItems
             }
             
-            return scriptApi.runScript(selectedScript, [selectedDevice], gameOptions)
+            return scriptApi.runScript(selectedScript, selectedDevices, gameOptions)
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['devices'] })
@@ -103,9 +98,23 @@ function App() {
         },
     })
 
-    const removeDevice = (deviceId: string) => {
-        setSelectedDevice(prev => prev === deviceId ? '' : prev)
-    }
+    // Convert devices and scripts to options format
+    const deviceOptions = devices.map((device: Device) => {
+        const isRunning = device.current_script && device.device_status === 'running'
+        return {
+            value: device.id,
+            label: device.device_name || device.id,
+            description: `Status: ${device.device_status}${device.screen_size ? ` | Size: ${device.screen_size[0]}x${device.screen_size[1]}` : ''}${isRunning ? ' (Running - Cannot select)' : ''}`,
+            disabled: isRunning
+        }
+    })
+
+    const scriptOptions = scripts.map((script: Script) => ({
+        value: script.id,
+        label: script.name,
+        description: script.description,
+        recommend: script.recommend
+    }))
 
     const handleRunNow = () => {
         runMutation.mutate()
@@ -119,303 +128,240 @@ function App() {
         stopDeviceMutation.mutate(deviceId)
     }
 
-    const runningDevices = devices.filter((device: Device) => device.current_script && device.current_script.state === 'running')
+    const runningDevices = devices.filter((device: Device) => device.current_script && device.device_status === 'running')
 
     const handleViewDevice = (deviceId: string) => {
         setSelectedDeviceDetail(deviceId)
         setShowDetailModal(true)
     }
 
-    const toggleDeviceTable = () => {
-        setShowDeviceTable(!showDeviceTable)
+    const handleViewLogs = (deviceId: string) => {
+        setSelectedDeviceForLogs(deviceId)
+        setShowLogModal(true)
     }
 
+    const getScriptDisplayName = (scriptId: string | undefined): string => {
+        if (!scriptId) return 'No script';
+        const script = scripts.find((s: Script) => s.id === scriptId);
+        return script ? script.name : scriptId; // Fallback to ID if name not found
+    }
+
+
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600">
-            <div className="container mx-auto px-4 py-4 sm:py-8 max-w-6xl">
-                <div className="text-center mb-6 sm:mb-8">
-                    <h1 className="text-2xl sm:text-3xl font-bold text-white mb-4">Welcome to Auto Tools!</h1>
-          
+        <div className="min-h-screen bg-gradient-to-br from-blue-500 via-purple-600 to-indigo-700">
+            <div className="container mx-auto px-4 py-4 sm:py-8 max-w-7xl">
+                <div className="text-center mb-12">
+                    <div className="space-y-3">
+                        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white mb-3 tracking-tight">
+                            <span className="bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent drop-shadow-lg">
+                                KVTM Auto Tools
+                            </span>
+                        </h1>
+                        <div className="flex items-center justify-center space-x-2">
+                            <div className="h-px bg-gradient-to-r from-transparent via-white to-transparent w-16 opacity-60"></div>
+                            <div className="w-2 h-2 bg-white rounded-full opacity-80"></div>
+                            <div className="h-px bg-gradient-to-r from-transparent via-white to-transparent w-16 opacity-60"></div>
+                        </div>
+                        <div className="flex justify-center items-center space-x-4 pt-2">
+                            <div className="w-1 h-1 bg-blue-200 rounded-full animate-bounce [animation-delay:0ms]"></div>
+                            <div className="w-1 h-1 bg-blue-300 rounded-full animate-bounce [animation-delay:150ms]"></div>
+                            <div className="w-1 h-1 bg-blue-200 rounded-full animate-bounce [animation-delay:300ms]"></div>
+                        </div>
+                    </div>
                 </div>
 
-                <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 mb-6 sm:mb-8">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
-                        <div>
-                            <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-4 sm:mb-6">Settings</h2>
-              
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Devices</label>
-                                    <div className="relative">
-                                        <select
-                                            value={selectedDevice}
-                                            onChange={(e) => setSelectedDevice(e.target.value)}
-                                            className="w-full p-3 border border-gray-300 rounded-lg appearance-none bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
-                                        >
-                                            <option value="">Select Device</option>
-                                            {devices.map((device: Device) => (
-                                                <option key={device.id} value={device.id}>
-                                                    {device.device_name || device.id}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                                        {selectedDevice && (
-                                            <button
-                                                onClick={() => removeDevice(selectedDevice)}
-                                                className="absolute right-10 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Script</label>
-                                    <div className="relative">
-                                        <select
-                                            value={selectedScript}
-                                            onChange={(e) => setSelectedScript(e.target.value)}
-                                            className="w-full p-3 border border-gray-300 rounded-lg appearance-none bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
-                                        >
-                                            <option value="">Select Script</option>
-                                            {scripts.map((script: Script) => (
-                                                <option key={script.id} value={script.id}>
-                                                    {script.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                                    </div>
-                                </div>
-                            </div>
+                <div className="relative z-10 bg-white rounded-xl shadow-2xl p-6 sm:p-8 mb-8 backdrop-blur-sm bg-opacity-95">
+                    <div className="flex items-center justify-between mb-6">
+                        <h2 className="text-lg sm:text-xl font-bold text-gray-900">Control Panel</h2>
+                        <button 
+                            onClick={() => setIsControlPanelExpanded(!isControlPanelExpanded)}
+                            className="lg:hidden inline-flex items-center px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                        >
+                            {isControlPanelExpanded ? (
+                                <>
+                                    <span className="text-sm font-medium text-gray-700 mr-2">Hide</span>
+                                    <ChevronUp className="w-4 h-4 text-gray-600" />
+                                </>
+                            ) : (
+                                <>
+                                    <span className="text-sm font-medium text-gray-700 mr-2">Show</span>
+                                    <ChevronDown className="w-4 h-4 text-gray-600" />
+                                </>
+                            )}
+                        </button>
+                    </div>
+                    
+                    {/* Collapsible content on mobile, always visible on desktop */}
+                    <div className={isControlPanelExpanded ? 'block transition-all duration-300' : 'hidden lg:block transition-all duration-300'}>
+                        {/* Device and Script Selection - Same line on desktop */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+                            <MultiSelect
+                                options={deviceOptions}
+                                values={selectedDevices}
+                                onChange={setSelectedDevices}
+                                placeholder="Select devices..."
+                                label="Devices"
+                            />
+                            <SearchableSelect
+                                options={scriptOptions}
+                                value={selectedScript}
+                                onChange={setSelectedScript}
+                                placeholder="Select script..."
+                                label="Script"
+                            />
                         </div>
 
-                        <div>
-                            <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-4 sm:mb-6">Game Option</h2>
-              
-                            <div className="space-y-4">
-
-                                <div className="grid grid-cols-3 gap-2 sm:gap-4">
-                                    <label className="flex items-center">
+                        {/* Game Options and Run Button - Equal width distribution */}
+                        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-end">
+                            <div className="lg:col-span-3">
+                                <h3 className="text-sm font-medium text-gray-700 mb-3">Game Options</h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <label className="flex items-center px-3 h-12 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors border border-gray-200">
                                         <input
                                             type="checkbox"
                                             checked={openGame}
                                             onChange={(e) => setOpenGame(e.target.checked)}
                                             className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
                                         />
-                                        <span className="ml-1 sm:ml-2 text-xs sm:text-sm text-gray-700">Open Game</span>
+                                        <span className="ml-3 text-sm text-gray-700 font-medium">Open Game</span>
                                     </label>
-                  
-                                    <label className="flex items-center">
+                                    <label className="flex items-center px-3 h-12 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors border border-gray-200">
                                         <input
                                             type="checkbox"
                                             checked={openChests}
                                             onChange={(e) => setOpenChests(e.target.checked)}
                                             className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
                                         />
-                                        <span className="ml-1 sm:ml-2 text-xs sm:text-sm text-gray-700">Open Chests</span>
+                                        <span className="ml-3 text-sm text-gray-700 font-medium">Open Chests</span>
                                     </label>
-                  
-                                    <label className="flex items-center">
+                                    <label className="flex items-center px-3 h-12 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors border border-gray-200">
                                         <input
                                             type="checkbox"
                                             checked={sellItems}
                                             onChange={(e) => setSellItems(e.target.checked)}
                                             className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
                                         />
-                                        <span className="ml-1 sm:ml-2 text-xs sm:text-sm text-gray-700">Sell Items</span>
+                                        <span className="ml-3 text-sm text-gray-700 font-medium">Sell Items</span>
                                     </label>
                                 </div>
-
-
-                                <div className="flex justify-start">
-                                    <button
-                                        onClick={handleRunNow}
-                                        disabled={!selectedDevice || !selectedScript || runMutation.isPending}
-                                        className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm sm:text-base"
-                                    >
-                    Run now!
-                                    </button>
-                                </div>
+                            </div>
+                            
+                            <div className="lg:col-span-1 flex justify-center lg:justify-end">
+                                <button
+                                    onClick={handleRunNow}
+                                    disabled={selectedDevices.length === 0 || !selectedScript || runMutation.isPending}
+                                    className="inline-flex items-center justify-center px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed font-semibold shadow-lg transition-all duration-200 transform hover:scale-105 min-w-[140px] h-12"
+                                >
+                                    <Play className="w-5 h-5 mr-2" />
+                                    Run Now!
+                                </button>
                             </div>
                         </div>
                     </div>
-                    
-                    {/* Collapse/Expand icon at bottom of settings */}
-                    <div className="flex justify-center pt-4 border-t border-gray-200">
-                        <button
-                            onClick={toggleDeviceTable}
-                            className="flex items-center justify-center w-10 h-10 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
-                            title={showDeviceTable ? "Hide Device Table" : "Show Device Table"}
-                        >
-                            {showDeviceTable ? (
-                                <ChevronUp className="w-5 h-5 text-gray-600" />
-                            ) : (
-                                <ChevronDown className="w-5 h-5 text-gray-600" />
-                            )}
-                        </button>
-                    </div>
                 </div>
 
-                <div className={`bg-white rounded-lg shadow-lg p-4 sm:p-6 transition-all duration-300 ${!showDeviceTable ? 'hidden' : ''}`}>
-                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 sm:mb-6 gap-3">
-                        <h2 className="text-lg sm:text-xl font-bold text-gray-900">Running Devices</h2>
+                <div className="relative z-0 bg-white rounded-xl shadow-2xl p-6 sm:p-8 backdrop-blur-sm bg-opacity-95">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-3">
+                        <div>
+                            <h2 className="text-lg sm:text-xl font-bold text-gray-900">Running Devices</h2>
+                            <p className="text-sm text-gray-500 mt-1">
+                                {runningDevices.length} device{runningDevices.length !== 1 ? 's' : ''} currently running
+                            </p>
+                        </div>
                         <div className="flex space-x-2">
-                            <button
-                                onClick={() => setShowLogsModal(true)}
-                                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium shadow-md transition-colors text-sm sm:text-base"
-                            >
-                                <FileText className="w-4 h-4 mr-2" />
-                                Logs
-                            </button>
                             <button
                                 onClick={handleStopAll}
                                 disabled={runningDevices.length === 0 || stopAllMutation.isPending}
-                                className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
+                                className="inline-flex items-center px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-md transition-colors text-sm"
                             >
+                                <Square className="w-4 h-4 mr-2" />
                                 Stop All
                             </button>
                         </div>
                     </div>
 
-                    <div className="overflow-x-auto">
-                        <table className="w-full table-auto min-w-[600px]">
-                            <thead>
-                                <tr className="border-b border-gray-200">
-                                    <th className="text-left py-3 px-2 sm:px-4 font-medium text-gray-700 text-sm">
-                                        <input type="checkbox" className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded" />
-                                    </th>
-                                    <th className="text-left py-3 px-2 sm:px-4 font-medium text-gray-700 text-sm">Device</th>
-                                    <th className="text-left py-3 px-2 sm:px-4 font-medium text-gray-700 text-sm">Script</th>
-                                    <th className="text-left py-3 px-2 sm:px-4 font-medium text-gray-700 text-sm">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {runningDevices.map((device: Device) => (
-                                    <tr key={device.id} className="border-b border-gray-100 hover:bg-gray-50">
-                                        <td className="py-3 sm:py-4 px-2 sm:px-4">
-                                            <input type="checkbox" className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded" />
-                                        </td>
-                                        <td className="py-3 sm:py-4 px-2 sm:px-4 font-medium text-gray-900 text-sm">
-                                            {device.device_name || device.id}
-                                        </td>
-                                        <td className="py-3 sm:py-4 px-2 sm:px-4 text-gray-700 text-sm">
-                                            {device.current_script?.script_name || 'No script'}
-                                        </td>
-                                        <td className="py-3 sm:py-4 px-2 sm:px-4">
-                                            <div className="flex flex-wrap gap-1 sm:gap-2">
-                                                <button
-                                                    onClick={() => handleStopDevice(device.id)}
-                                                    className="px-2 sm:px-3 py-1 bg-red-500 text-white rounded text-xs sm:text-sm hover:bg-red-600"
-                                                >
-                          Stop
-                                                </button>
-                                                <button 
-                                                    onClick={() => handleViewDevice(device.id)}
-                                                    className="px-2 sm:px-3 py-1 bg-blue-500 text-white rounded text-xs sm:text-sm hover:bg-blue-600"
-                                                >
-                          View
-                                                </button>
-                                                <button 
-                                                    onClick={() => setShowLogsModal(true)}
-                                                    className="px-2 sm:px-3 py-1 bg-blue-500 text-white rounded text-xs sm:text-sm hover:bg-blue-600"
-                                                >
-                          Logs
-                                                </button>
-                                                <button 
-                                                    onClick={() => handleViewDevice(device.id)}
-                                                    className="px-2 sm:px-3 py-1 bg-blue-500 text-white rounded text-xs sm:text-sm hover:bg-blue-600"
-                                                >
-                          Detail
-                                                </button>
+                    {runningDevices.length > 0 ? (
+                        <div className="space-y-4">
+                            {runningDevices.map((device: Device) => (
+                                <div key={device.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:shadow-md transition-shadow">
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                                        <div className="flex-1">
+                                            <h3 className="font-semibold text-gray-900 text-lg">{device.device_name || device.id}</h3>
+                                            <p className="text-sm text-gray-600 mt-1">
+                                                Script: <span className="font-medium">{getScriptDisplayName(device.current_script)}</span>
+                                            </p>
+                                            {device.last_seen && (
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    Last seen: {new Date(device.last_seen).toLocaleString()}
+                                                </p>
+                                            )}
+                                            <div className="flex items-center mt-2">
+                                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse mr-2"></div>
+                                                <span className="text-sm text-green-700 font-medium">Running</span>
                                             </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                                <tr className="border-b border-gray-100 hover:bg-gray-50">
-                                    <td className="py-3 sm:py-4 px-2 sm:px-4">
-                                        <input type="checkbox" className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded" />
-                                    </td>
-                                    <td className="py-3 sm:py-4 px-2 sm:px-4 font-medium text-gray-900 text-sm">
-                    Kai
-                                    </td>
-                                    <td className="py-3 sm:py-4 px-2 sm:px-4 text-gray-700 text-sm">
-                    Example Script
-                                    </td>
-                                    <td className="py-3 sm:py-4 px-2 sm:px-4">
-                                        <div className="flex flex-wrap gap-1 sm:gap-2">
-                                            <button 
-                                                onClick={() => handleStopDevice('kai')}
-                                                className="px-2 sm:px-3 py-1 bg-red-500 text-white rounded text-xs sm:text-sm hover:bg-red-600"
+                                        </div>
+                                        
+                                        {/* Action buttons - Responsive: 1x5 mobile, 3x2 tablet, 5x1 desktop */}
+                                        <div className="flex flex-col gap-2 sm:grid sm:grid-cols-3 sm:gap-2 lg:flex lg:flex-row lg:space-x-2">
+                                            <button
+                                                onClick={() => handleStopDevice(device.id)}
+                                                className="inline-flex items-center justify-center px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm font-medium transition-colors min-w-[80px]"
                                             >
-                        Stop
+                                                <Square className="w-4 h-4 mr-1" />
+                                                Stop
                                             </button>
                                             <button 
-                                                onClick={() => handleViewDevice('kai')}
-                                                className="px-2 sm:px-3 py-1 bg-blue-500 text-white rounded text-xs sm:text-sm hover:bg-blue-600"
+                                                onClick={() => handleViewDevice(device.id)}
+                                                className="inline-flex items-center justify-center px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium transition-colors min-w-[80px]"
                                             >
-                        View
+                                                View
                                             </button>
                                             <button 
-                                                onClick={() => setShowLogsModal(true)}
-                                                className="px-2 sm:px-3 py-1 bg-blue-500 text-white rounded text-xs sm:text-sm hover:bg-blue-600"
+                                                onClick={() => handleViewLogs(device.id)}
+                                                className="inline-flex items-center justify-center px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm font-medium transition-colors min-w-[80px]"
                                             >
-                        Logs
+                                                <ScrollText className="w-4 h-4 mr-1" />
+                                                Logs
                                             </button>
                                             <button 
-                                                onClick={() => handleViewDevice('kai')}
-                                                className="px-2 sm:px-3 py-1 bg-blue-500 text-white rounded text-xs sm:text-sm hover:bg-blue-600"
+                                                onClick={() => handleViewDevice(device.id)}
+                                                className="inline-flex items-center justify-center px-3 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 text-sm font-medium transition-colors min-w-[80px]"
                                             >
-                        Detail
+                                                Detail
                                             </button>
                                         </div>
-                                    </td>
-                                </tr>
-                                {runningDevices.length === 0 && (
-                                    <tr>
-                                        <td colSpan={4} className="py-8 text-center text-gray-500 text-sm">
-                      No devices are currently running
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div className="flex justify-center mt-4 sm:mt-6">
-                        <div className="flex items-center space-x-2">
-                            <button className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50">
-                &lt;
-                            </button>
-                            <button className="px-3 py-1 bg-blue-500 text-white rounded text-sm">
-                1
-                            </button>
-                            <button className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50">
-                &gt;
-                            </button>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
-                    </div>
+                    ) : (
+                        <div className="text-center py-12">
+                            <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                                <MonitorOff className="w-8 h-8 text-gray-400" />
+                            </div>
+                            <h3 className="text-lg font-medium text-gray-900 mb-2">No Running Devices</h3>
+                            <p className="text-gray-500">Select devices and a script above to get started</p>
+                        </div>
+                    )}
+
                 </div>
 
-                <div className="text-center mt-8">
-                    <p className="text-white text-sm">© Design by conganhhcmus</p>
+                <div className="text-center mt-12">
+                    <div className="border-t border-white border-opacity-20 pt-6">
+                        <p className="text-white text-sm opacity-80">© 2025 Design by conganhhcmus | KVTM Auto Tools</p>
+                    </div>
                 </div>
             </div>
 
-            <DeviceModal 
-                isOpen={showDeviceModal} 
-                onClose={() => setShowDeviceModal(false)} 
-            />
-            <LogsModal 
-                isOpen={showLogsModal} 
-                onClose={() => setShowLogsModal(false)} 
-            />
             <DeviceDetailModal 
                 isOpen={showDetailModal} 
                 onClose={() => setShowDetailModal(false)}
                 deviceId={selectedDeviceDetail}
+            />
+            <DeviceLogModal 
+                isOpen={showLogModal} 
+                onClose={() => setShowLogModal(false)}
+                deviceId={selectedDeviceForLogs}
             />
         </div>
     )

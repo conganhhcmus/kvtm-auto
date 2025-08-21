@@ -1,0 +1,156 @@
+import React, { useEffect, useRef } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { ScrollText, Copy, RefreshCw } from 'lucide-react'
+import { deviceApi } from '@/api'
+import Modal from './Modal'
+
+interface DeviceLogModalProps {
+    isOpen: boolean
+    onClose: () => void
+    deviceId: string
+}
+
+interface LogEntry {
+    timestamp: string
+    level: string
+    message: string
+    [key: string]: any
+}
+
+interface LogResponse {
+    device_id: string
+    logs: LogEntry[]
+    total_lines: number
+}
+
+const DeviceLogModal: React.FC<DeviceLogModalProps> = ({ isOpen, onClose, deviceId }) => {
+    const logContainerRef = useRef<HTMLDivElement>(null)
+    
+    const { data: logData, isLoading, isError, refetch } = useQuery<LogResponse>({
+        queryKey: ['device-logs', deviceId],
+        queryFn: () => deviceApi.getDeviceLogs(deviceId, 500).then(res => res.data),
+        enabled: isOpen && !!deviceId,
+        refetchInterval: 3000, // Auto-refresh every 3 seconds
+    })
+
+    // Auto-scroll to bottom when new logs are added
+    useEffect(() => {
+        if (logContainerRef.current && logData?.logs) {
+            logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight
+        }
+    }, [logData?.logs])
+
+    const handleCopyLogs = () => {
+        if (logData?.logs) {
+            const logText = logData.logs
+                .map(log => `[${log.timestamp}] ${log.level}: ${log.message}`)
+                .join('\n')
+            navigator.clipboard.writeText(logText)
+        }
+    }
+
+    const getLevelColor = (level: string) => {
+        switch (level.toLowerCase()) {
+            case 'error':
+                return 'text-red-600'
+            case 'warning':
+            case 'warn':
+                return 'text-yellow-600'
+            case 'info':
+                return 'text-blue-600'
+            case 'debug':
+                return 'text-gray-600'
+            default:
+                return 'text-gray-800'
+        }
+    }
+
+    const formatTimestamp = (timestamp: string) => {
+        try {
+            return new Date(timestamp).toLocaleTimeString()
+        } catch {
+            return timestamp
+        }
+    }
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={`Device Logs - ${deviceId}`} size="xl">
+            <div className="space-y-4">
+                {/* Header with controls */}
+                <div className="flex items-center justify-between pb-2 border-b">
+                    <div className="flex items-center space-x-2">
+                        <ScrollText className="w-5 h-5 text-gray-600" />
+                        <span className="text-sm text-gray-600">
+                            {logData ? `${logData.total_lines} log entries` : 'Loading logs...'}
+                        </span>
+                    </div>
+                    <div className="flex space-x-2">
+                        <button
+                            onClick={() => refetch()}
+                            disabled={isLoading}
+                            className="inline-flex items-center px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 disabled:opacity-50 transition-colors"
+                        >
+                            <RefreshCw className={`w-4 h-4 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
+                            Refresh
+                        </button>
+                        <button
+                            onClick={handleCopyLogs}
+                            disabled={!logData?.logs?.length}
+                            className="inline-flex items-center px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 disabled:opacity-50 transition-colors"
+                        >
+                            <Copy className="w-4 h-4 mr-1" />
+                            Copy All
+                        </button>
+                    </div>
+                </div>
+
+                {/* Log content */}
+                <div 
+                    ref={logContainerRef}
+                    className="bg-black text-green-400 font-mono text-sm p-4 rounded-lg h-96 overflow-y-auto border"
+                    style={{ fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace' }}
+                >
+                    {isLoading ? (
+                        <div className="flex items-center justify-center h-full text-gray-500">
+                            <RefreshCw className="w-6 h-6 mr-2 animate-spin" />
+                            Loading logs...
+                        </div>
+                    ) : isError ? (
+                        <div className="flex items-center justify-center h-full text-red-400">
+                            <span>Error loading logs. Please try refreshing.</span>
+                        </div>
+                    ) : !logData?.logs?.length ? (
+                        <div className="flex items-center justify-center h-full text-gray-500">
+                            <span>No logs available for this device.</span>
+                        </div>
+                    ) : (
+                        <div className="space-y-1">
+                            {logData.logs.map((log, index) => (
+                                <div key={index} className="leading-relaxed">
+                                    <span className="text-gray-400">
+                                        [{formatTimestamp(log.timestamp)}]
+                                    </span>
+                                    {' '}
+                                    <span className={`font-semibold ${getLevelColor(log.level)}`}>
+                                        {log.level.toUpperCase()}:
+                                    </span>
+                                    {' '}
+                                    <span className="text-green-300">
+                                        {log.message}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer info */}
+                <div className="text-xs text-gray-500 pt-2 border-t">
+                    Auto-refreshes every 3 seconds • Scroll to see older logs • Click "Copy All" to copy all logs to clipboard
+                </div>
+            </div>
+        </Modal>
+    )
+}
+
+export default DeviceLogModal

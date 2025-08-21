@@ -21,11 +21,10 @@ class GameOptions(BaseModel):
     )
     max_loops: int = Field(
         default=1000,
-        description="Maximum number of times to loop the script execution (hardcoded)"
+        description="Maximum number of times to loop the script execution (hardcoded)",
     )
     loop_delay: float = Field(
-        default=1.0,
-        description="Delay between loop iterations in seconds (hardcoded)"
+        default=1.0, description="Delay between loop iterations in seconds (hardcoded)"
     )
 
     @field_validator("open_game", "open_chest", "sell_items", mode="before")
@@ -56,8 +55,6 @@ class GameOptions(BaseModel):
             raise ValueError("loop_delay must be non-negative")
         return value
 
-
-
     def __str__(self) -> str:
         """String representation of game options."""
         return (
@@ -67,23 +64,27 @@ class GameOptions(BaseModel):
         )
 
 
-
 class Script(BaseModel):
     """Simple script model"""
-    id: str = Field(..., description="Unique script identifier (same as script filename)")
+
+    id: str = Field(
+        ..., description="Unique script identifier (same as script filename)"
+    )
     name: str = Field(..., description="Human-readable script name")
     description: Optional[str] = Field(None, description="Script description")
     order: int = Field(default=0, description="Display order")
     recommend: bool = Field(default=False, description="Whether script is recommended")
-    
-    @validator('id')
+
+    @validator("id")
     def validate_id(cls, v):
-        if not v or not v.replace('_', '').replace('-', '').isalnum():
-            raise ValueError('Script ID must be alphanumeric or contain underscores/hyphens')
+        if not v or not v.replace("_", "").replace("-", "").isalnum():
+            raise ValueError(
+                "Script ID must be alphanumeric or contain underscores/hyphens"
+            )
         return v
-    
-    @validator('order')
+
+    @validator("order")
     def validate_order(cls, v):
         if v < 0:
-            raise ValueError('Order must be non-negative')
+            raise ValueError("Order must be non-negative")
         return v

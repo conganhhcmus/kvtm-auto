@@ -18,25 +18,25 @@ class Image:
     def read_asset_image_bytes(asset_filename: str) -> bytes:
         """
         Read image from assets folder and return raw bytes
-        
+
         Args:
             asset_filename: Filename in the assets folder (e.g., 'test.png')
-            
+
         Returns:
             Image bytes
-            
+
         Raises:
             FileNotFoundError: If asset file doesn't exist
         """
         # Build path to assets folder relative to this file
         # backend/src/core/image.py -> backend/assets/
         current_file = Path(__file__)
-        assets_path = current_file.parent.parent.parent / 'assets' / asset_filename
+        assets_path = current_file.parent.parent.parent / "assets" / asset_filename
         assets_path = assets_path.resolve()
-        
+
         if not assets_path.exists():
             raise FileNotFoundError(f"Asset file not found: {assets_path}")
-            
+
         return Image.read_image_bytes(str(assets_path))
 
     @staticmethod
