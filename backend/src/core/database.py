@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from loguru import logger
 
-from ..models import Device, DeviceStatus, Script
+from ..models import Device, DeviceStatus, Script, GameOptions
 
 
 class Database:
@@ -94,6 +94,10 @@ class Database:
                     )
                     continue
 
+                # Convert game_options dict to GameOptions model if present
+                if device_data.get("game_options") and isinstance(device_data["game_options"], dict):
+                    device_data["game_options"] = GameOptions(**device_data["game_options"])
+                
                 device = Device(**device_data)
                 devices.append(device)
             except Exception as e:
@@ -114,6 +118,10 @@ class Database:
         for device_data in devices:
             if device_data.get("id") == device_id:
                 try:
+                    # Convert game_options dict to GameOptions model if present
+                    if device_data.get("game_options") and isinstance(device_data["game_options"], dict):
+                        device_data["game_options"] = GameOptions(**device_data["game_options"])
+                    
                     return Device(**device_data)
                 except Exception as e:
                     logger.error(f"Failed to parse device data for {device_id}: {e}")
@@ -151,20 +159,23 @@ class Database:
         self,
         device_id: str,
         script_id: str,
+        game_options: Optional[GameOptions] = None,
     ) -> None:
-        """Set device current script"""
+        """Set device current script and game options"""
         device = self.get_device(device_id)
         if device:
             device.current_script = script_id
             device.device_status = DeviceStatus.RUNNING.value
+            device.game_options = game_options
             self.save_device(device)
 
     def stop_device_script(self, device_id: str) -> None:
         """Stop device script and clear current script"""
         device = self.get_device(device_id)
         if device and device.current_script:
-            # Clear current script and set device as available
+            # Clear current script, game options and set device as available
             device.current_script = None
+            device.game_options = None
             device.device_status = DeviceStatus.AVAILABLE.value
             self.save_device(device)
 

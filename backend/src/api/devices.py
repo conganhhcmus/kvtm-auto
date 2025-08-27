@@ -4,16 +4,47 @@ Handles device discovery and logging only
 """
 
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException
 from loguru import logger
 from pydantic import BaseModel
 
 from ..core import adb, db
-from ..models import Device, DeviceStatus
+from ..models import Device, DeviceStatus, GameOptions
 
 router = APIRouter()
+
+
+class DeviceDetailResponse(BaseModel):
+    """Response model for detailed device information"""
+
+    # Basic device information
+    id: str
+    device_name: str
+    device_status: str
+    screen_size: Optional[List[int]] = None
+    last_seen: Optional[str] = None
+    
+    # Script execution information
+    current_script: Optional[str] = None
+    script_name: Optional[str] = None
+    game_options: Optional[GameOptions] = None
+    
+    # Additional device metadata (for future expansion)
+    model: Optional[str] = None
+    android_version: Optional[str] = None
+    api_level: Optional[str] = None
+    architecture: Optional[str] = None
+    connection_type: Optional[str] = None
+    ip_address: Optional[str] = None
+    battery_level: Optional[int] = None
+    screen_on: Optional[bool] = None
+    cpu_usage: Optional[float] = None
+    total_storage: Optional[str] = None
+    available_storage: Optional[str] = None
+    ram: Optional[str] = None
+    current_auto: Optional[str] = None
 
 
 class DeviceLogsResponse(BaseModel):
@@ -106,6 +137,50 @@ async def get_all_devices():
 
     except Exception as e:
         logger.error(f"Failed to get devices: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{device_id}", response_model=DeviceDetailResponse)
+async def get_device_detail(device_id: str):
+    """Get detailed information for a specific device"""
+    try:
+        device = db.get_device(device_id)
+        if not device:
+            raise HTTPException(status_code=404, detail=f"Device {device_id} not found")
+
+        # Prepare the response with basic device information
+        response_data = {
+            "id": device.device_id,
+            "device_name": device.device_name,
+            "device_status": device.device_status,
+            "screen_size": list(device.screen_size) if device.screen_size else None,
+            "last_seen": device.last_seen,
+            "current_script": device.current_script,
+            "game_options": device.game_options,
+        }
+
+        # If device is running a script, get script name
+        if device.current_script:
+            script = db.get_script(device.current_script)
+            if script:
+                response_data["script_name"] = script.name
+                # Set current_auto for backward compatibility
+                response_data["current_auto"] = script.name
+
+        # For now, set default values for additional metadata
+        # These could be enhanced in the future with real device info from ADB
+        response_data.update({
+            "model": f"Android Device {device_id}",
+            "connection_type": "USB",
+            "screen_on": True if device.device_status == "running" else None,
+        })
+
+        return DeviceDetailResponse(**response_data)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get device detail for {device_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

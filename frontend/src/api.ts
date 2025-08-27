@@ -6,6 +6,32 @@ export interface GameOptions {
     open_game?: boolean
     open_chest?: boolean
     sell_items?: boolean
+    max_loops?: number
+    loop_delay?: number
+}
+
+export interface DeviceDetail {
+    id: string
+    device_name: string
+    device_status: string
+    screen_size?: number[]
+    last_seen?: string
+    current_script?: string
+    script_name?: string
+    game_options?: GameOptions
+    model?: string
+    android_version?: string
+    api_level?: string
+    architecture?: string
+    connection_type?: string
+    ip_address?: string
+    battery_level?: number
+    screen_on?: boolean
+    cpu_usage?: number
+    total_storage?: string
+    available_storage?: string
+    ram?: string
+    current_auto?: string
 }
 
 export const api = axios.create({

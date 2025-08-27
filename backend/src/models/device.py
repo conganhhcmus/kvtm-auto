@@ -5,6 +5,8 @@ from typing import Optional, Tuple
 
 from pydantic import BaseModel, Field
 
+from .script import GameOptions
+
 
 class DeviceStatus(Enum):
     """Device status."""
@@ -29,6 +31,9 @@ class Device(BaseModel):
     last_seen: Optional[str] = Field(default=None, description="Last seen timestamp")
     current_script: Optional[str] = Field(
         default=None, description="Currently running script ID"
+    )
+    game_options: Optional[GameOptions] = Field(
+        default=None, description="Game options when script is running"
     )
 
     class Config:

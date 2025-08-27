@@ -81,6 +81,7 @@ async def start_script(request: StartRequest, background_tasks: BackgroundTasks)
         db.set_device_script(
             device_id=request.device_id,
             script_id=request.script_id,
+            game_options=game_options,
         )
 
         logger.info(
