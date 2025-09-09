@@ -23,14 +23,6 @@ interface Script {
     recommend: boolean
 }
 
-interface ScriptExecution {
-    id: string
-    script_id: string
-    device_ids: string[]
-    status: 'running' | 'completed' | 'failed'
-    started_at: string
-    completed_at?: string
-}
 
 function App() {
     const queryClient = useQueryClient()
@@ -45,10 +37,13 @@ function App() {
     const [showLogModal, setShowLogModal] = useState(false)
     const [selectedDeviceForLogs, setSelectedDeviceForLogs] = useState('')
     const [isControlPanelExpanded, setIsControlPanelExpanded] = useState(true)
+    const [stoppingDevices, setStoppingDevices] = useState<Set<string>>(new Set())
 
     const { data: devices = [] } = useQuery({
         queryKey: ['devices'],
         queryFn: () => deviceApi.getDevices().then(res => res.data),
+        //refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
+        refetchIntervalInBackground: true, // Keep updating even when tab is not focused
     })
 
     const { data: scripts = [] } = useQuery({
@@ -70,30 +65,62 @@ function App() {
             return scriptApi.runScript(selectedScript, selectedDevices, gameOptions)
         },
         onSuccess: () => {
+            // Store counts before clearing for success message
+            const deviceCount = selectedDevices.length
+            
+            // Clear form selections after successful run
+            setSelectedDevices([])
+            setSelectedScript('')
+            
+            // Invalidate and refetch devices data immediately for faster UI update
             queryClient.invalidateQueries({ queryKey: ['devices'] })
+            
+            // Optional: Show success feedback (you could add a toast notification here)
+            console.log(`Successfully started script on ${deviceCount} device(s)`)
+        },
+        onError: (error) => {
+            // Handle errors gracefully
+            console.error('Failed to start script:', error)
+            // You could add error toast notifications here
         },
     })
 
     const stopAllMutation = useMutation({
-        mutationFn: async () => {
-            const executions = await scriptApi.getScriptExecutions()
-            const runningExecutions = executions.data.filter((exec: ScriptExecution) => exec.status === 'running')
-            await Promise.all(runningExecutions.map((exec: ScriptExecution) => scriptApi.stopScript(exec.id)))
+        mutationFn: () => scriptApi.stopAllDevices(),
+        onSuccess: (response) => {
+            // Immediately invalidate and refetch for faster UI update
+            queryClient.invalidateQueries({ queryKey: ['devices'] })
+            queryClient.refetchQueries({ queryKey: ['devices'] })
+            
+            // Log detailed results for debugging
+            const result = response.data
+            console.log(`Stop All completed: ${result.message}`)
+            
+            if (result.failed_devices.length > 0) {
+                console.warn('Some devices failed to stop:', result.device_details.filter((d: any) => d.status === 'failed'))
+            }
+            
+            // Show success feedback
+            console.log(`Successfully stopped ${result.stopped_devices.length}/${result.total_devices} devices`)
         },
-        onSuccess: () => {
+        onError: (error) => {
+            console.error('Stop All failed:', error)
+            // Still try to refresh devices in case some were stopped
             queryClient.invalidateQueries({ queryKey: ['devices'] })
         },
     })
 
     const stopDeviceMutation = useMutation({
-        mutationFn: async (deviceId: string) => {
-            const executions = await scriptApi.getScriptExecutions()
-            const deviceExecutions = executions.data.filter((exec: ScriptExecution) => 
-                exec.status === 'running' && exec.device_ids.includes(deviceId)
-            )
-            await Promise.all(deviceExecutions.map((exec: ScriptExecution) => scriptApi.stopScript(exec.id)))
+        mutationFn: (deviceId: string) => scriptApi.stopDevice(deviceId),
+        onSuccess: (_, deviceId) => {
+            // Immediately invalidate and refetch for faster UI update
+            queryClient.invalidateQueries({ queryKey: ['devices'] })
+            queryClient.refetchQueries({ queryKey: ['devices'] })
+            console.log(`Successfully stopped device ${deviceId}`)
         },
-        onSuccess: () => {
+        onError: (error, deviceId) => {
+            console.error(`Failed to stop device ${deviceId}:`, error)
+            // Still try to refresh in case of partial success
             queryClient.invalidateQueries({ queryKey: ['devices'] })
         },
     })
@@ -125,7 +152,19 @@ function App() {
     }
 
     const handleStopDevice = (deviceId: string) => {
-        stopDeviceMutation.mutate(deviceId)
+        // Add device to stopping set for UI feedback
+        setStoppingDevices(prev => new Set([...prev, deviceId]))
+        
+        stopDeviceMutation.mutate(deviceId, {
+            onSettled: () => {
+                // Remove device from stopping set when operation completes
+                setStoppingDevices(prev => {
+                    const newSet = new Set(prev)
+                    newSet.delete(deviceId)
+                    return newSet
+                })
+            }
+        })
     }
 
     const runningDevices = devices.filter((device: Device) => device.current_script && device.device_status === 'running')
@@ -272,10 +311,19 @@ function App() {
                             <button
                                 onClick={handleStopAll}
                                 disabled={runningDevices.length === 0 || stopAllMutation.isPending}
-                                className="inline-flex items-center px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-md transition-colors text-sm"
+                                className="inline-flex items-center px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-md transition-colors text-sm min-w-[90px]"
                             >
-                                <Square className="w-4 h-4 mr-2" />
-                                Stop All
+                                {stopAllMutation.isPending ? (
+                                    <>
+                                        <div className="w-4 h-4 mr-2 animate-spin border-2 border-white border-t-transparent rounded-full"></div>
+                                        Stopping...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Square className="w-4 h-4 mr-2" />
+                                        Stop All
+                                    </>
+                                )}
                             </button>
                         </div>
                     </div>
@@ -305,10 +353,20 @@ function App() {
                                         <div className="flex flex-col gap-2 sm:grid sm:grid-cols-3 sm:gap-2 lg:flex lg:flex-row lg:space-x-2">
                                             <button
                                                 onClick={() => handleStopDevice(device.id)}
-                                                className="inline-flex items-center justify-center px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm font-medium transition-colors min-w-[80px]"
+                                                disabled={stoppingDevices.has(device.id)}
+                                                className="inline-flex items-center justify-center px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors min-w-[80px]"
                                             >
-                                                <Square className="w-4 h-4 mr-1" />
-                                                Stop
+                                                {stoppingDevices.has(device.id) ? (
+                                                    <>
+                                                        <div className="w-4 h-4 mr-1 animate-spin border-2 border-white border-t-transparent rounded-full"></div>
+                                                        Stop...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Square className="w-4 h-4 mr-1" />
+                                                        Stop
+                                                    </>
+                                                )}
                                             </button>
                                             <button 
                                                 onClick={() => handleViewDevice(device.id)}

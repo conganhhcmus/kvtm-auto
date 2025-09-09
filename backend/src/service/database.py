@@ -1,21 +1,24 @@
 """
-Database manager for device state persistence using JSON files
+Database manager for device state persistence using JSON files with file locking
 """
 
+import fcntl
 import json
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from loguru import logger
 
+from ..libs.time_provider import local_now_iso, create_log_message
 from ..models import Device, DeviceStatus, Script, GameOptions
 
 
 class Database:
     """JSON database manager for devices and scripts"""
 
-    def __init__(self, data_dir: str = "data"):
+    def __init__(self, data_dir: str = "src/data"):
         # Database operations will use the direct logger
         self.data_dir = Path(data_dir)
         self.devices_file = self.data_dir / "devices.json"
@@ -33,39 +36,120 @@ class Database:
         if not self.logs_file.exists():
             self._save_device_logs({})
 
+    def _acquire_file_lock(self, file_handle, timeout: float = 5.0) -> bool:
+        """Acquire exclusive file lock with timeout"""
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            try:
+                fcntl.flock(file_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                return True
+            except (IOError, OSError):
+                time.sleep(0.1)
+        return False
+
+    def _release_file_lock(self, file_handle):
+        """Release file lock"""
+        try:
+            fcntl.flock(file_handle.fileno(), fcntl.LOCK_UN)
+        except (IOError, OSError) as e:
+            logger.warning(f"Failed to release file lock: {e}")
+
     def _load_devices(self) -> List[Dict[str, Any]]:
-        """Load devices data from JSON file"""
+        """Load devices data from JSON file with file locking"""
         try:
             with open(self.devices_file, "r") as f:
-                return json.load(f)
+                if self._acquire_file_lock(f):
+                    try:
+                        data = json.load(f)
+                        return data
+                    finally:
+                        self._release_file_lock(f)
+                else:
+                    logger.warning("Failed to acquire file lock for reading devices data")
+                    # Fallback: try without lock
+                    f.seek(0)
+                    return json.load(f)
         except (FileNotFoundError, json.JSONDecodeError) as e:
             logger.error(f"Failed to load devices data: {e}")
             return []
 
     def _save_devices(self, devices: List[Dict[str, Any]]) -> None:
-        """Save devices data to JSON file"""
+        """Save devices data to JSON file with file locking"""
         try:
-            with open(self.devices_file, "w") as f:
-                json.dump(devices, f, indent=2, default=str)
+            # Write to temporary file first, then rename for atomic operation
+            temp_file = self.devices_file.with_suffix('.tmp')
+            
+            with open(temp_file, "w") as f:
+                if self._acquire_file_lock(f):
+                    try:
+                        json.dump(devices, f, indent=2, default=str)
+                        f.flush()
+                    finally:
+                        self._release_file_lock(f)
+                else:
+                    logger.warning("Failed to acquire file lock for writing devices data")
+                    # Write anyway, but log the warning
+                    json.dump(devices, f, indent=2, default=str)
+                    f.flush()
+            
+            # Atomic rename
+            temp_file.replace(self.devices_file)
+            
         except Exception as e:
             logger.error(f"Failed to save devices data: {e}")
+            # Clean up temp file if it exists
+            temp_file = self.devices_file.with_suffix('.tmp')
+            if temp_file.exists():
+                try:
+                    temp_file.unlink()
+                except Exception:
+                    pass
 
     def _load_scripts(self) -> List[Dict[str, Any]]:
-        """Load scripts data from JSON file"""
+        """Load scripts data from JSON file with file locking"""
         try:
             with open(self.scripts_file, "r") as f:
-                return json.load(f)
+                if self._acquire_file_lock(f):
+                    try:
+                        data = json.load(f)
+                        return data
+                    finally:
+                        self._release_file_lock(f)
+                else:
+                    logger.warning("Failed to acquire file lock for reading scripts data")
+                    f.seek(0)
+                    return json.load(f)
         except (FileNotFoundError, json.JSONDecodeError) as e:
             logger.error(f"Failed to load scripts data: {e}")
             return []
 
     def _save_scripts(self, scripts_data: List[Dict[str, Any]]) -> None:
-        """Save scripts data to JSON file"""
+        """Save scripts data to JSON file with file locking"""
         try:
-            with open(self.scripts_file, "w") as f:
-                json.dump(scripts_data, f, indent=2, default=str)
+            temp_file = self.scripts_file.with_suffix('.tmp')
+            
+            with open(temp_file, "w") as f:
+                if self._acquire_file_lock(f):
+                    try:
+                        json.dump(scripts_data, f, indent=2, default=str)
+                        f.flush()
+                    finally:
+                        self._release_file_lock(f)
+                else:
+                    logger.warning("Failed to acquire file lock for writing scripts data")
+                    json.dump(scripts_data, f, indent=2, default=str)
+                    f.flush()
+            
+            temp_file.replace(self.scripts_file)
+            
         except Exception as e:
             logger.error(f"Failed to save scripts data: {e}")
+            temp_file = self.scripts_file.with_suffix('.tmp')
+            if temp_file.exists():
+                try:
+                    temp_file.unlink()
+                except Exception:
+                    pass
 
     def get_scripts_data(self) -> List[Dict[str, Any]]:
         """Get raw scripts data from JSON file"""
@@ -132,7 +216,7 @@ class Database:
         """Save Device model to JSON file"""
         devices = self._load_devices()
         device_dict = device.to_dict()
-        device_dict["last_updated"] = datetime.now().isoformat()
+        device_dict["last_updated"] = local_now_iso()
 
         # Find existing device or create new one
         device_found = False
@@ -196,30 +280,53 @@ class Database:
         except Exception as e:
             logger.error(f"Failed to save device logs: {e}")
 
-    def write_log(self, device_id: str, message: str, level: str = "INFO") -> None:
-        """Write log entry for specific device"""
-        try:
-            logs_data = self._load_device_logs()
+    def write_log(self, device_id: str, action: str, index: Optional[str] = None) -> None:
+        """Write formatted log entry for specific device: [Time]: [Action] [Index]"""
+        formatted_message = create_log_message(action, index)
+        self.write_simple_log(device_id, formatted_message)
 
-            if device_id not in logs_data:
-                logs_data[device_id] = []
+    def write_simple_log(self, device_id: str, formatted_message: str) -> None:
+        """Write pre-formatted log message for specific device"""
+        logs_data = self._load_device_logs()
 
-            log_entry = {
-                "timestamp": datetime.now().isoformat(),
-                "level": level,
-                "message": message,
-            }
+        if device_id not in logs_data:
+            logs_data[device_id] = []
 
-            logs_data[device_id].append(log_entry)
+        # Store the formatted message directly (no timestamp/level needed)
+        log_entry = {
+            "message": formatted_message,
+            "level": "INFO",
+            "created_at": local_now_iso()  # Keep for internal sorting/management
+        }
 
-            # Keep only last 1000 logs per device
-            if len(logs_data[device_id]) > 1000:
-                logs_data[device_id] = logs_data[device_id][-1000:]
+        logs_data[device_id].append(log_entry)
 
-            self._save_device_logs(logs_data)
+        # Keep only last 1000 logs per device
+        if len(logs_data[device_id]) > 1000:
+            logs_data[device_id] = logs_data[device_id][-1000:]
 
-        except Exception as e:
-            logger.error(f"Failed to write log for device {device_id}: {e}")
+        self._save_device_logs(logs_data)
+
+    def write_legacy_log(self, device_id: str, message: str, level: str = "INFO") -> None:
+        """Legacy log method for backward compatibility"""
+        logs_data = self._load_device_logs()
+
+        if device_id not in logs_data:
+            logs_data[device_id] = []
+
+        log_entry = {
+            "timestamp": local_now_iso(),
+            "level": level,
+            "message": message,
+        }
+
+        logs_data[device_id].append(log_entry)
+
+        # Keep only last 1000 logs per device
+        if len(logs_data[device_id]) > 1000:
+            logs_data[device_id] = logs_data[device_id][-1000:]
+
+        self._save_device_logs(logs_data)
 
     def get_device_logs(self, device_id: str, limit: int = 100) -> List[Dict[str, Any]]:
         """Get logs for specific device"""
@@ -290,7 +397,7 @@ class Database:
         """Save Script model to JSON file"""
         scripts_data = self._load_scripts()
         script_dict = script.model_dump()
-        script_dict["last_updated"] = datetime.now().isoformat()
+        script_dict["last_updated"] = local_now_iso()
 
         # Find existing script or create new one
         script_found = False
@@ -311,7 +418,7 @@ class Database:
         scripts_data = []
         for script in scripts:
             script_dict = script.model_dump()
-            script_dict["last_updated"] = datetime.now().isoformat()
+            script_dict["last_updated"] = local_now_iso()
             scripts_data.append(script_dict)
 
         self._save_scripts(scripts_data)

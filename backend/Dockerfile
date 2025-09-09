@@ -7,6 +7,7 @@ ENV PYTHONUNBUFFERED=1
 ENV POETRY_NO_INTERACTION=1
 ENV POETRY_VENV_IN_PROJECT=1
 ENV POETRY_CACHE_DIR=/opt/poetry_cache
+ENV TZ=Asia/Bangkok
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -41,12 +42,7 @@ RUN poetry config virtualenvs.create false \
 
 # Copy application code
 COPY src/ ./src/
-COPY scripts/ ./scripts/
-COPY assets/ ./assets/
 # COPY test/ ./test/
-
-# Create directories for logs and data
-RUN mkdir -p logs data
 
 # Expose port
 EXPOSE 8000

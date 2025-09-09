@@ -13,18 +13,20 @@ from fastapi.responses import JSONResponse
 from loguru import logger
 
 from .api import devices, execute, scripts
+from .libs.time_provider import GMT_PLUS_7
+from .service.executor import executor
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan management"""
     # Setup logging
-    log_path = Path("logs/application.log")
+    log_path = Path("src/logs/application.log")
     log_path.parent.mkdir(parents=True, exist_ok=True)
 
     logger.add(
         log_path,
-        format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
+        format="{time:YYYY-MM-DD HH:mm:ss.SSS Z} | {level: <8} | {name}:{function}:{line} - {message}",
         level="INFO",
         rotation="10 MB",
         retention="30 days",
@@ -38,6 +40,12 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("Shutting down KVTM Auto Backend...")
+    
+    # Stop all running device processes
+    logger.info("Stopping all device processes...")
+    result = executor.shutdown_all()
+    logger.info(f"Shutdown result: {result}")
+    
     logger.info("Application shutdown complete")
 
 
@@ -52,7 +60,7 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://frontend:3000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

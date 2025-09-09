@@ -26,6 +26,9 @@ class GameOptions(BaseModel):
     loop_delay: float = Field(
         default=1.0, description="Delay between loop iterations in seconds (hardcoded)"
     )
+    game_load_wait: float = Field(
+        default=10.0, description="Time to wait for game to load in seconds"
+    )
 
     @field_validator("open_game", "open_chest", "sell_items", mode="before")
     @classmethod
@@ -47,12 +50,12 @@ class GameOptions(BaseModel):
             raise ValueError("max_loops cannot exceed 1000")
         return value
 
-    @field_validator("loop_delay")
+    @field_validator("loop_delay", "game_load_wait")
     @classmethod
-    def validate_loop_delay(cls, value: float) -> float:
-        """Validate loop_delay is non-negative."""
+    def validate_delays(cls, value: float) -> float:
+        """Validate delay values are non-negative."""
         if value < 0:
-            raise ValueError("loop_delay must be non-negative")
+            raise ValueError("Delay values must be non-negative")
         return value
 
     def __str__(self) -> str:
@@ -60,7 +63,8 @@ class GameOptions(BaseModel):
         return (
             f"GameOptions(open_game={self.open_game}, "
             f"open_chest={self.open_chest}, sell_items={self.sell_items}, "
-            f"max_loops={self.max_loops}, loop_delay={self.loop_delay})"
+            f"max_loops={self.max_loops}, loop_delay={self.loop_delay}, "
+            f"game_load_wait={self.game_load_wait})"
         )
 
 

@@ -29,9 +29,9 @@ class Image:
             FileNotFoundError: If asset file doesn't exist
         """
         # Build path to assets folder relative to this file
-        # backend/src/core/image.py -> backend/assets/
+        # backend/src/libs/image.py -> backend/src/assets/
         current_file = Path(__file__)
-        assets_path = current_file.parent.parent.parent / "assets" / asset_filename
+        assets_path = current_file.parent.parent / "assets" / asset_filename
         assets_path = assets_path.resolve()
 
         if not assets_path.exists():

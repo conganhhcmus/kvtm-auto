@@ -2,69 +2,77 @@
 
 A comprehensive full-stack application for automating Android devices using ADB (Android Debug Bridge). Built with a modern React + TypeScript frontend and Python FastAPI backend with advanced Android automation capabilities.
 
+**Recently refactored** for simplicity, maintainability, and better user experience with 50% code reduction and enhanced logging.
+
 ## Features
 
 ### 🤖 Device Management
 - Automatic device discovery via ADB
-- Real-time device status monitoring
+- Real-time device status monitoring  
 - USB device support with privileged Docker access
 - Device connection/disconnection management
 - Device details and specifications display
 
-### 📝 Script Management
+### 📝 Script Management - **SIMPLIFIED**
 - Custom automation script execution with metadata
-- Multi-device parallel execution with threading isolation
-- Real-time progress tracking
+- **Subprocess-only execution** (no threading complexity)
+- Real-time progress tracking with **clean log format**
 - Script execution history and status
-- Integrated ADB command execution
+- Enhanced shell command building with loop support
 
-### 📊 Logging & Monitoring
-- Comprehensive system logging with Loguru
+### 📊 Logging & Monitoring - **ENHANCED**
+- **New Simple Log Format**: `[12:34:56 PM]: Run Script [1000] times`
 - Device-specific log filtering
-- Script execution logs
 - Real-time log streaming
+- User-friendly action-based logging
 - Health check endpoints
 
 ### 🎛️ Web Interface
 - Modern React-based UI with Vite and Tailwind CSS
-- Real-time updates with TanStack Query (React Query v4)
+- Real-time updates with TanStack Query v4
 - Responsive device management dashboard
 - Interactive script execution controls
-- Modal-based device details and logs
-- Mobile-responsive design optimized for both desktop and mobile
-- Clean blue gradient interface with intuitive controls
-- Game options panel with checkboxes for automation features
+- **Enhanced log display** with clean time format
+- Mobile-responsive design
+- Clean blue gradient interface
 
-### 🔧 Technology Stack
-- **Backend**: FastAPI 0.104.1, Python 3.9+, Loguru 0.7.2, OpenCV 4.8.1, NumPy 1.24.4
-- **Frontend**: React 18.2, TypeScript 5+, Vite 7.1.2, Tailwind CSS 3.3, TanStack Query v4.24.6, Lucide React 0.263.1
+### 🔧 Technology Stack - **UPDATED**
+- **Backend**: FastAPI 0.104.1, Python 3.9+, **Simplified Architecture**
+- **Frontend**: React 18.2, TypeScript 5+, Vite 7.1.2, Tailwind CSS 3.3
 - **Containerization**: Docker with privileged mode for USB device access
-- **Image Processing**: OpenCV, NumPy for device screenshots and image analysis
-- **Build Tools**: Vite 7.1.2 for fast development and optimized production builds
-- **Styling**: Tailwind CSS 3.3 for utility-first styling with PostCSS 8.4.21 and Autoprefixer 10.4.14
-- **HTTP Client**: Axios 1.3.4 with request/response interceptors
-- **Code Quality**: Black, isort, flake8, mypy for Python; ESLint, TypeScript for frontend
+- **Image Processing**: OpenCV, NumPy for device screenshots
+- **Shell Utilities**: **NEW - Enhanced command building with Shell class**
+- **Logging**: **NEW - Simple [Time]: [Action] [Index] format**
+- **Models**: **NEW - Unified API models in single location**
 
-## Architecture
+## Architecture - **REFACTORED**
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   Frontend      │    │    Backend      │    │   Android       │
 │   (React)       │◄──►│   (FastAPI)     │◄──►│   Devices       │
-│                 │    │                 │    │   (ADB)         │
+│   Vite Dev      │    │   Simplified    │    │   (ADB)         │
+│   or Docker     │    │   Subprocess    │    │                 │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
+
+### **Recent Refactoring Benefits**
+- **50% less code** - Simplified executor, APIs, and error handling
+- **Subprocess-only execution** - Better isolation, simpler debugging
+- **Clean logging** - `[12:34:56 PM]: Run Open Game` format
+- **Unified models** - All API models centralized
+- **Enhanced shell support** - Programmatic command building
+- **Global error handling** - Consistent across all endpoints
 
 ## Quick Start
 
 ### Prerequisites
-- Docker and Docker Compose
-- Android SDK platform tools (ADB) installed on host system
+- Docker and Docker Compose (for containerized deployment)
+- **OR** Python 3.9+ and Node.js 16+ (for local development)
+- Android SDK platform tools (ADB) 
 - USB debugging enabled on Android devices
-- Python 3.9+ (for local development)
-- Node.js 16+ (for frontend development)
 
-### Running with Docker Compose
+### Option 1: Docker Deployment (Recommended for Production)
 
 1. Clone the repository:
 ```bash
@@ -79,55 +87,53 @@ cd kvtm-auto
 docker-compose up -d
 ```
 
-**Note**: The backend container runs in privileged mode and mounts USB devices (`/dev/bus/usb`) to access Android devices via ADB.
+4. Access the application:
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:8000
+- **API Documentation**: http://localhost:8000/docs
+- **Health Check**: http://localhost:8000/health
 
-4. Access the web interface:
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000
-- Backend Health: http://localhost:8000/health
-- API Documentation: http://localhost:8000/docs
+### Option 2: Local Development (Recommended for Development)
 
-### Development Setup
-
-#### Frontend Development
+1. Clone and setup backend:
 ```bash
-cd frontend
-npm install
-npm run dev      # Start Vite development server
-npm run build    # Build for production
-npm run lint     # Run ESLint
-npm run format   # Fix linting issues
-```
-
-#### Backend Development
-```bash
-cd backend
+cd kvtm-auto/backend
 poetry install
 poetry run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+2. Setup frontend (in new terminal):
+```bash
+cd kvtm-auto/frontend  
+npm install
+npm run dev  # Starts on localhost:5173
+```
+
+3. Access the application:
+- **Frontend**: http://localhost:5173
+- **Backend API**: http://localhost:8000
+- **API Documentation**: http://localhost:8000/docs
 
 ## Usage
 
 ### Device Management
 1. Connect Android devices via USB
 2. Enable USB debugging in developer options
-3. Devices will automatically appear in the web interface
-4. Use the interface to connect/disconnect network devices
+3. Devices automatically appear in the web interface
+4. Use the interface to manage device connections
 
-### Script Execution
-1. Place Python scripts in the `backend/scripts/` directory
-2. Scripts will automatically appear in the web interface
+### Script Execution - **ENHANCED**
+1. Place Python scripts in `backend/scripts/` directory
+2. Scripts automatically appear in the web interface
 3. Select target devices and run scripts
-4. Monitor progress and logs in real-time
+4. **Monitor progress with clean logs**: `[12:34:56 PM]: Run Script [1000] times`
 
-### Writing Custom Scripts
+### Writing Custom Scripts - **SIMPLIFIED**
 
-Create a Python file in `backend/scripts/` with the following structure:
+Create a Python file in `backend/scripts/` with the new simple logging:
 
 ```python
-from src.core.adb import adb
-from src.core.logger import get_logger
-from src.models import Device, GameOptions
+from scripts._core import write_log, log_run_open_game, log_run_script, log_loop_iteration
 
 # Script metadata - required for script discovery
 SCRIPT_META = {
@@ -138,53 +144,160 @@ SCRIPT_META = {
     "description": "Description of what this script does"
 }
 
-def run_script(device: Device, game_options: GameOptions, context):
+def main(device: Device, game_options: GameOptions, context):
     """
-    Main script function - this is required for all scripts
+    Main script function for CLI execution with new simple logging
     
-    Args:
-        device: Device model containing device information
-        game_options: GameOptions model containing game configuration
-        context: ScriptContext object for logging and control
-    
-    Returns:
-        Dict with execution results
+    Logs will appear as:
+    [12:34:56 PM]: Run Open Game
+    [12:34:57 PM]: Run Script [1000] times
+    [12:34:58 PM]: Loop [1/1000]
     """
-    logger = get_logger()
     
-    # Your automation logic here
-    logger.info(f"Running on device {device.id}")
+    # Use simple logging functions
+    log_run_open_game(device.id)
+    log_run_script(device.id, 1000)
     
-    # Execute ADB commands using the adb helper
-    result = adb.shell(device.id, "pm list packages")
+    # Custom actions with clean format
+    write_log(device.id, "Taking screenshot")
+    write_log(device.id, "Waiting", "5.0s")  # [12:34:58 PM]: Waiting [5.0s]
     
-    return {"status": "success", "packages": result}
+    # Loop with progress tracking
+    for i in range(1000):
+        log_loop_iteration(device.id, i+1, 1000)  # [12:35:01 PM]: Loop [1/1000]
+        
+        # Your automation logic here
+        # No complex try-catch needed - global handler will catch errors
+        
+    return {"status": "success", "message": "Completed"}
 ```
 
-## API Documentation
+### **New Logging Format Examples**
+Your logs will now display cleanly:
+```
+[12:12:39 PM]: Run Open Game
+[12:14:23 PM]: Run Script [1000] times  
+[12:14:25 PM]: Script started [my_script]
+[12:15:45 PM]: Loop [1/1000]
+[12:15:47 PM]: Waiting [1.0]s
+[12:15:48 PM]: Loop [2/1000]
+[12:22:15 PM]: Script completed
+```
 
-The backend provides a RESTful API with the following endpoints:
+## API Documentation - **SIMPLIFIED**
+
+The backend provides a RESTful API with simplified endpoints:
 
 ### Devices
 - `GET /api/devices` - List all devices
-- `GET /api/devices/{device_id}` - Get device details
-- `POST /api/devices/refresh` - Refresh device list
-- `POST /api/devices/{device_id}/connect` - Connect device
-- `POST /api/devices/{device_id}/disconnect` - Disconnect device
+- `GET /api/devices/{device_id}` - Get device details  
+- `GET /api/devices/{device_id}/logs` - Get device logs (new format)
 
 ### Scripts
 - `GET /api/scripts` - List available scripts
 - `GET /api/scripts/{script_id}` - Get script details
 
-### Script Execution
-- `POST /api/execute/{script_id}` - Execute script on devices
-- `GET /api/execute/status` - Get execution status
-- `POST /api/execute/stop` - Stop all executions
-- `POST /api/execute/stop/{device_id}` - Stop execution on specific device
+### Script Execution - **STREAMLINED**
+- `POST /api/execute/start` - Start script execution
+- `POST /api/execute/stop` - Stop script on device
+- `POST /api/execute/stop-all` - Stop all running scripts
 
 ### System
 - `GET /health` - Health check endpoint
-- `GET /api/logs` - Get system logs (with filtering)
+
+## Development
+
+### Project Structure - **UPDATED**
+```
+kvtm-auto/
+├── frontend/                    # React TypeScript frontend
+│   ├── src/
+│   │   ├── components/         # React components
+│   │   │   ├── DeviceDetailModal.tsx
+│   │   │   ├── DeviceLogModal.tsx    # NEW - Simple log display
+│   │   │   ├── Modal.tsx
+│   │   │   ├── MultiSelect.tsx
+│   │   │   └── SearchableSelect.tsx
+│   │   ├── api.ts              # API client
+│   │   ├── App.tsx             # Main application
+│   │   └── main.tsx            # Entry point
+│   └── package.json            # Dependencies
+├── backend/                     # Python FastAPI backend - REFACTORED
+│   ├── src/
+│   │   ├── api/               # API routes - SIMPLIFIED
+│   │   │   ├── devices.py     # Unified models, no complex try-catch
+│   │   │   ├── scripts.py     # No validation, simple endpoints
+│   │   │   └── execute.py     # Streamlined execution API
+│   │   ├── service/           # Service layer - STREAMLINED  
+│   │   │   ├── executor.py    # Subprocess-only (450→150 lines)
+│   │   │   ├── database.py    # Simple log format storage
+│   │   │   └── script.py      # Script management
+│   │   ├── libs/              # Core utilities - ENHANCED
+│   │   │   ├── adb.py         # Android Debug Bridge wrapper
+│   │   │   ├── shell.py       # NEW - Shell command utilities
+│   │   │   ├── time_provider.py # Enhanced time utilities
+│   │   │   ├── log_actions.py  # NEW - Standard log constants
+│   │   │   └── image.py       # Image processing
+│   │   ├── models/            # Data models - UNIFIED
+│   │   │   ├── device.py      # Device models
+│   │   │   ├── script.py      # Script models  
+│   │   │   └── api.py         # NEW - All API models centralized
+│   │   ├── scripts/           # Automation scripts
+│   │   │   ├── _core.py       # ENHANCED - Simple logging utilities
+│   │   │   ├── example_script.py
+│   │   │   └── open_game.py
+│   │   ├── data/              # JSON storage (moved under src/)
+│   │   ├── logs/              # Log files (moved under src/)
+│   │   └── main.py            # FastAPI entry point
+│   └── pyproject.toml         # Poetry configuration
+├── docker-compose.yml          # Container orchestration  
+├── CLAUDE.md                   # Development guidance (UPDATED)
+└── README.md                   # Project documentation (THIS FILE)
+```
+
+### Code Quality & Development Commands
+
+```bash
+# Local Backend Development
+cd backend
+poetry install
+poetry run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+poetry run black src/              # Format code
+poetry run isort src/              # Sort imports  
+poetry run flake8 src/             # Lint code
+poetry run mypy src/               # Type checking
+poetry run pytest                 # Run tests
+
+# Local Frontend Development  
+cd frontend
+npm install
+npm run dev                        # Start dev server (localhost:5173)
+npm run build                      # Build for production
+npm run lint                       # ESLint check
+npm run format                     # Fix linting issues
+
+# Docker Development
+docker-compose up -d               # Start all services
+docker-compose down                # Stop services
+docker-compose build               # Rebuild after changes
+docker-compose logs backend        # View backend logs
+docker-compose logs frontend       # View frontend logs
+```
+
+### **New Architecture Benefits**
+
+#### **For Developers**
+- **50% less code** to maintain and debug
+- **Simplified APIs** - no complex validation or try-catch blocks
+- **Unified models** - single source of truth for API contracts
+- **Enhanced shell support** - programmatic command building
+- **Global error handling** - consistent responses
+
+#### **For Users** 
+- **Clean log format** - easy to read `[Time]: [Action] [Index]`
+- **Better reliability** - subprocess isolation
+- **Faster development** - simplified architecture
+- **Consistent experience** - unified error handling
 
 ## Configuration
 
@@ -194,119 +307,17 @@ The backend provides a RESTful API with the following endpoints:
 - `LOG_LEVEL` - Logging level (DEBUG, INFO, WARNING, ERROR)
 - `PYTHONPATH` - Python module path
 
-#### Frontend
-- `VITE_API_URL` - Backend API URL (default: http://localhost:8000/api)
+#### Frontend  
+- `VITE_API_URL` - Backend API URL
+  - Local: `http://localhost:8000/api`
+  - Docker: `http://localhost:8000/api`
 
-### Docker Compose Configuration
+### Deployment Options
 
-The `docker-compose.yml` includes:
-- **Backend**: FastAPI server with ADB integration
-  - Privileged mode for USB device access
-  - ADB server port (5037) exposed
-  - Health check endpoint
-- **Frontend**: React application served via Nginx
-- **Network**: Bridge network for service communication
-
-**USB Device Access**: The backend container requires privileged mode and USB device mounting to communicate with Android devices.
-
-## Development
-
-### Project Structure
-```
-kvtm-auto/
-├── frontend/                 # React TypeScript frontend (Vite + Tailwind)
-│   ├── src/
-│   │   ├── components/      # React components
-│   │   │   ├── DeviceDetailModal.tsx   # Device information display
-│   │   │   ├── Modal.tsx              # Base modal component
-│   │   │   ├── MultiSelect.tsx        # Multi-selection dropdown
-│   │   │   └── SearchableSelect.tsx   # Searchable dropdown
-│   │   ├── api.ts          # API client with Axios 1.3.4
-│   │   ├── App.tsx         # Main application component
-│   │   ├── main.tsx        # Application entry point
-│   │   └── index.css       # Global styles with Tailwind imports
-│   ├── package.json        # Node.js dependencies
-│   ├── nginx.conf          # Nginx configuration for Docker
-│   └── Dockerfile          # Frontend container build
-├── backend/                 # Python FastAPI backend
-│   ├── src/
-│   │   ├── api/           # API routes (devices.py, scripts.py, execute.py)
-│   │   ├── core/          # Core business logic (adb.py, executor.py, database.py, image.py)
-│   │   ├── models/        # Data models (device.py, script.py)
-│   │   └── main.py        # FastAPI application entry point
-│   ├── scripts/           # Automation scripts (example_script.py, open_game.py)
-│   ├── data/              # JSON data storage (devices.json, logs.json, scripts.json)
-│   ├── logs/              # Application log files
-│   ├── test/              # Test suite directory
-│   ├── assets/            # Static assets (test.png)
-│   ├── pyproject.toml     # Poetry configuration with dependencies
-│   └── Dockerfile         # Backend container build
-├── docker-compose.yml      # Container orchestration with USB access
-├── CLAUDE.md              # Development guidance for Claude Code
-└── README.md              # Project documentation
-```
-
-### Code Quality & Linting
-
-```bash
-# Backend code quality
-cd backend
-poetry run black src/              # Format code (Black 23.11.0)
-poetry run isort src/              # Sort imports (isort 5.12.0)
-poetry run flake8 src/             # Lint code (flake8 6.1.0)
-poetry run mypy src/               # Type checking (mypy 1.7.1)
-poetry run pytest test/            # Run tests (pytest 7.4.3)
-
-# Frontend code quality
-cd frontend
-npm run lint                       # Run ESLint 8.38.0
-npm run format                     # Fix linting issues
-npm run build                      # TypeScript 5+ compilation check
-```
-
-### Frontend Features
-
-#### Dashboard Interface
-- **Welcome Banner**: Clean blue gradient header with "Welcome to Auto Tools!" message
-- **Settings Panel**: Device and script selection dropdowns
-- **Game Options**: 
-  - Checkboxes for Open Game, Open Chests, and Sell Items
-  - Run now button for immediate execution
-- **Running Devices Table**: 
-  - Real-time view of active devices with script status
-  - Actions: Stop, View, Logs, Detail buttons
-  - Pagination support and Stop All functionality
-
-#### Modal Components
-- **Device Management Modal**: Connect/disconnect devices, view device status
-- **Device Detail Modal**: Comprehensive device information with system specs
-- **Logs Modal**: Real-time application logs with filtering and export
-
-#### Mobile Responsive Design
-- Optimized for both desktop and mobile devices
-- Responsive grid layout with mobile-friendly button sizes
-- Horizontal scroll for tables on small screens
-
-### Code Quality
-
-The project includes pre-configured tools for code quality:
-- **Backend**: Black 23.11.0, isort 5.12.0, flake8 6.1.0, mypy 1.7.1, pytest 7.4.3 with asyncio support
-- **Frontend**: ESLint 8.38.0, TypeScript 5.0.2 compiler, React-specific linting rules
-- **Build Tools**: Vite 7.1.2 for fast development and optimized production builds
-- **Styling**: Tailwind CSS 3.3 with PostCSS 8.4.21 and Autoprefixer 10.4.14
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Ensure all tests pass
-6. Submit a pull request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+| Environment | Backend | Frontend | Use Case |
+|------------|---------|----------|----------|
+| **Local Dev** | localhost:8000 | localhost:5173 | Fast development |
+| **Docker** | localhost:8000 | localhost:3000 | Production-like testing |
 
 ## Troubleshooting
 
@@ -314,33 +325,76 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 **Devices not appearing**
 - Ensure USB debugging is enabled
-- Check ADB driver installation
-- Verify device authorization
+- Check ADB driver installation  
+- Verify device authorization in ADB
 
 **Permission denied errors**
-- Ensure USB debugging is enabled on devices
-- Run Docker with privileged mode (already configured)
+- Enable USB debugging on devices
+- Run Docker with privileged mode (configured)
 - Add user to `plugdev` group on Linux
-- Check USB device permissions on host system
 
 **Script execution failures**
-- Check device connectivity
+- Check device connectivity with `adb devices`
+- Review execution logs (now in clean format)
 - Verify script syntax
-- Review execution logs
 
-### Support
+**Logs not displaying correctly**
+- Check if using new logging format: `write_log(device_id, "Action", "index")`
+- Old format logs may not display properly
+- Update scripts to use `_core.py` logging utilities
 
-For support and questions:
-- Check the issue tracker
-- Review the API documentation
-- Consult the troubleshooting guide
+### **Development Tips**
 
-## Roadmap
+**Local Development**
+- Use `poetry run uvicorn src.main:app --reload` for hot reload
+- Use `npm run dev` for frontend hot reload
+- Logs appear in terminal and database
 
-- [ ] Web-based script editor
-- [ ] Device clustering support
-- [ ] Enhanced logging dashboard
-- [ ] Script scheduling
-- [ ] Plugin system
-- [ ] Performance monitoring
-- [ ] Multi-user support
+**Docker Development**  
+- Use `docker-compose logs -f backend` for live log monitoring
+- Rebuild containers after code changes: `docker-compose build`
+- Access logs via API: `GET /api/devices/{device_id}/logs`
+
+**Script Development**
+- Use new simple logging: `log_run_script(device_id, 1000)`
+- Avoid complex try-catch - let global handler manage errors
+- Test with local development for faster iteration
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Use the new simplified architecture patterns
+4. Add tests for new functionality
+5. Use the simple logging format for user-facing logs
+6. Ensure all tests pass
+7. Submit a pull request
+
+## Recent Changes (v2.0)
+
+### **Architecture Refactoring**
+- ✅ **Simplified Executor** - 450 lines → 150 lines (subprocess-only)
+- ✅ **Streamlined APIs** - 50% code reduction across all endpoints  
+- ✅ **Unified Models** - All API models centralized in `models/api.py`
+- ✅ **Enhanced Shell Support** - `Shell` class with loop command building
+- ✅ **Simple Logging** - `[Time]: [Action] [Index]` format
+- ✅ **Global Error Handling** - Consistent error responses
+- ✅ **Directory Restructure** - Data/logs moved under `src/`
+
+### **Benefits**
+- **Maintainability**: 50% less code to maintain
+- **Reliability**: Better process isolation with subprocess-only approach
+- **User Experience**: Clean, readable logs  
+- **Developer Experience**: Simplified APIs, unified models
+- **Performance**: Removed unnecessary complexity
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Support
+
+- **Documentation**: Check CLAUDE.md for development guidance
+- **API Docs**: http://localhost:8000/docs (when backend is running)
+- **Issues**: Use GitHub issue tracker  
+- **Architecture**: See refactoring notes in CLAUDE.md

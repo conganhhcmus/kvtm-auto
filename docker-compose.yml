@@ -16,9 +16,8 @@ services:
     networks:
       - kvtm-network
     volumes:
-      - ./backend/scripts:/app/scripts
-      - ./backend/logs:/app/logs
-      - ./backend/data:/app/data
+      - ./backend/src/logs:/app/src/logs
+      - ./backend/src/data:/app/src/data
       # Mount USB devices for ADB access
       - /dev/bus/usb:/dev/bus/usb
     privileged: true  # Required for USB device access

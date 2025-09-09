@@ -83,11 +83,12 @@ export const scriptApi = {
     getScripts: () => api.get('/scripts/'),
     getScript: (scriptId: string) => api.get(`/scripts/${scriptId}`),
     runScript: (scriptId: string, deviceIds: string[], gameOptions?: GameOptions) => 
-        api.post(`/scripts/${scriptId}/run`, { 
+        api.post('/execute/start', { 
             device_ids: deviceIds,
+            script_id: scriptId,
             game_options: gameOptions || {}
         }),
-    stopScript: (executionId: string) => api.post(`/scripts/executions/${executionId}/stop`),
-    getScriptExecutions: () => api.get('/scripts/executions'),
+    stopDevice: (deviceId: string) => api.post('/execute/stop', { device_id: deviceId }),
+    stopAllDevices: () => api.post('/execute/stop-all'),
 }
 

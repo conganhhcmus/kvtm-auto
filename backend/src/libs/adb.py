@@ -1,3 +1,15 @@
+"""
+ADB (Android Debug Bridge) operations for device control.
+
+IMPORTANT: This module uses subprocess.run() for ALL operations to ensure clean process management.
+DO NOT replace with subprocess.Popen() or persistent shell connections as they can cause:
+- Orphaned subprocess processes when script processes are terminated
+- Application restart issues due to resource cleanup problems  
+- Process leakage that interferes with the main application lifecycle
+
+Each ADB command creates a short-lived process that completes and cleans up automatically.
+"""
+
 import subprocess
 import time
 from typing import List, Optional, Tuple
@@ -9,12 +21,18 @@ class ADB:
     """Android Debug Bridge operations for device control"""
 
     @staticmethod
+    def _build_adb_command(device_id: Optional[str], *args) -> List[str]:
+        """Build ADB command with optional device ID"""
+        cmd = ["adb"]
+        if device_id:
+            cmd += ["-s", device_id]
+        cmd.extend(args)
+        return cmd
+
+    @staticmethod
     def _send_event(cmd: str, device_id: Optional[str] = None):
         """Send low-level touch event to device"""
-        args = ["adb"]
-        if device_id:
-            args += ["-s", device_id]
-        args += ["shell", "sendevent", EVENT] + cmd.split()
+        args = ADB._build_adb_command(device_id, "shell", "sendevent", EVENT) + cmd.split()
         subprocess.run(args)
 
     @staticmethod
@@ -57,19 +75,13 @@ class ADB:
     @staticmethod
     def tap(x: int, y: int, device_id: Optional[str] = None):
         """Tap at specific coordinates"""
-        args = ["adb"]
-        if device_id:
-            args += ["-s", device_id]
-        args += ["shell", "input", "tap", str(x), str(y)]
+        args = ADB._build_adb_command(device_id, "shell", "input", "tap", str(x), str(y))
         subprocess.run(args)
 
     @staticmethod
     def get_screen_size(device_id: Optional[str] = None) -> Tuple[int, int]:
         """Get device screen dimensions"""
-        args = ["adb"]
-        if device_id:
-            args += ["-s", device_id]
-        args += ["shell", "wm", "size"]
+        args = ADB._build_adb_command(device_id, "shell", "wm", "size")
         result = subprocess.run(args, capture_output=True, text=True)
 
         # data sample: Physical size: 1280x720
@@ -78,10 +90,7 @@ class ADB:
     @staticmethod
     def capture_screen(device_id: Optional[str] = None) -> bytes:
         """Capture device screen as PNG bytes"""
-        args = ["adb"]
-        if device_id:
-            args += ["-s", device_id]
-        args += ["shell", "screencap", "-p"]
+        args = ADB._build_adb_command(device_id, "shell", "screencap", "-p")
         result = subprocess.run(args, capture_output=True)
 
         return result.stdout
@@ -89,7 +98,7 @@ class ADB:
     @staticmethod
     def get_list_devices() -> List[str]:
         """Get list of connected devices"""
-        args = ["adb", "devices"]
+        args = ADB._build_adb_command(None, "devices")
         result = subprocess.run(args, capture_output=True, text=True)
 
         # data sample:
@@ -105,28 +114,20 @@ class ADB:
     @staticmethod
     def press_key(keycode, device_id: Optional[str] = None):
         """Press a key using Android keycode"""
-        args = ["adb"]
-        if device_id:
-            args += ["-s", device_id]
-        args += ["shell", "input", "keyevent", str(keycode)]
+        args = ADB._build_adb_command(device_id, "shell", "input", "keyevent", str(keycode))
         subprocess.run(args)
 
     @staticmethod
     def close_app(package_name: str, device_id: Optional[str] = None):
         """Force stop an app by package name"""
-        args = ["adb"]
-        if device_id:
-            args += ["-s", device_id]
-        args += ["shell", "am", "force-stop", package_name]
+        args = ADB._build_adb_command(device_id, "shell", "am", "force-stop", package_name)
         subprocess.run(args)
 
     @staticmethod
     def open_app(package_name: str, device_id: Optional[str] = None):
         """Open an app by package name"""
-        args = ["adb"]
-        if device_id:
-            args += ["-s", device_id]
-        args += [
+        args = ADB._build_adb_command(
+            device_id,
             "shell",
             "monkey",
             "-p",
@@ -134,9 +135,14 @@ class ADB:
             "-c",
             "android.intent.category.LAUNCHER",
             "1",
-        ]
+        )
         subprocess.run(args)
 
+    @staticmethod
+    def kill_monkey(device_id: Optional[str] = None):
+        """Kill all monkey processes on device"""
+        args = ADB._build_adb_command(device_id, "shell", "pkill", "-f", "monkey")
+        subprocess.run(args)
 
 # Global ADB instance
 adb = ADB()

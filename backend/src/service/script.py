@@ -21,13 +21,13 @@ class ScriptManager:
         Initialize ScriptManager
 
         Args:
-            scripts_dir: Path to scripts directory (defaults to backend/scripts)
+            scripts_dir: Path to scripts directory (defaults to src/scripts)
         """
         if scripts_dir is None:
-            # Default to backend/scripts relative to this file
+            # Default to src/scripts relative to this file
             current_dir = Path(__file__).parent
-            backend_dir = current_dir.parent.parent
-            scripts_dir = backend_dir / "scripts"
+            src_dir = current_dir.parent
+            scripts_dir = src_dir / "scripts"
 
         self.scripts_dir = scripts_dir
 
