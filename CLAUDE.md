@@ -166,6 +166,7 @@ log_loop_iteration(device_id, 1, 1000)  # [12:13:01 PM]: Loop [1/1000]
 - Use `docker-compose up` for full-stack testing
 - All logs display in clean `[Time]: [Action] [Index]` format
 - Shell commands built with `Shell.build_script_execution_command()`
+- Keep `__init__.py` file is empty
 
 ## Testing & Quality Assurance
 

@@ -1,82 +1,47 @@
 """
 Simple script execution system for KVTM Auto
-Handles script execution per device using subprocess only
+Handles script execution per device using direct import instead of subprocess
 """
-
-import subprocess
-from typing import Dict
 
 from loguru import logger
 
-from ..libs.shell import Shell
 from ..models.script import GameOptions
-from . import adb, db
+from ..libs.adb import adb
+from .database import db
 from .script import script_manager
+from .script_runner import script_runner
 
 
 class Executor:
-    """Simple subprocess-based script executor"""
+    """Direct import-based script executor (like JavaScript imports)"""
 
     def __init__(self):
-        self._running_scripts: Dict[str, subprocess.Popen] = {}
+        # Delegate to script_runner for actual execution
+        self._script_runner = script_runner
 
     def run(self, device_id: str, script_id: str, game_options: GameOptions):
-        """Execute a script on a device"""
+        """Execute a script on a device using direct import"""
         if self.is_running(device_id):
             logger.warning(f"Device {device_id} is already running a script")
             return
 
+        # Verify script exists
         script_path = script_manager.get_script_path(script_id)
         if not script_path:
             raise FileNotFoundError(f"Script {script_id} not found")
 
-        # Get open_game script path if needed
-        open_game_path = None
+        # Verify open_game script exists if needed
         if game_options.open_game:
             open_game_path = script_manager.get_script_path("open_game")
-
-        # Build shell command using the Shell class
-        cmd = Shell.build_script_execution_command(
-            device_id=device_id,
-            script_id=script_id,
-            script_path=script_path,
-            game_options=game_options,
-            open_game_path=open_game_path
-        )
+            if not open_game_path:
+                logger.warning("Open game script not found, disabling open_game option")
+                game_options.open_game = False
 
         db.write_log(device_id, "Script started", script_id)
-        logger.info(f"Executing: {' '.join(cmd)}")
+        logger.info(f"Starting direct execution of script {script_id} on device {device_id}")
 
-        # Start subprocess
-        process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            cwd="/app",
-            env={"PYTHONUNBUFFERED": "1"}
-        )
-
-        self._running_scripts[device_id] = process
-        logger.info(f"Started script {script_id} on device {device_id} (PID: {process.pid})")
-
-        # Monitor output in background (fire and forget)
-        self._monitor_output(device_id, process)
-
-    def _monitor_output(self, device_id: str, process: subprocess.Popen):
-        """Monitor subprocess output and log to database"""
-        for line in iter(process.stdout.readline, ''):
-            if not line:
-                break
-            
-            line = line.rstrip()
-            # logger.info(f"[{device_id}] {line}")
-            # Store raw subprocess output as simple logs
-            db.write_simple_log(device_id, line)
-
-        # Process finished, cleanup
-        self._cleanup_device(device_id)
-        logger.info(f"Script execution completed for device {device_id}")
+        # Use script runner for direct execution
+        self._script_runner.run_script(device_id, script_id, game_options)
 
     def stop(self, device_id: str, timeout: float = 5.0) -> bool:
         """Stop script execution for a device"""
@@ -84,80 +49,29 @@ class Executor:
         
         db.stop_device_script(device_id)
         
-        if device_id not in self._running_scripts:
-            return True
+        # Kill monkey processes if any
+        try:
+            adb.kill_monkey(device_id)
+        except Exception as e:
+            logger.debug(f"Failed to kill monkey processes for {device_id}: {e}")
 
-        process = self._running_scripts[device_id]
+        # Stop script using script runner
+        result = self._script_runner.stop_script(device_id, timeout)
         
-        if process.poll() is not None:
-            self._cleanup_device(device_id)
-            return True
-
-        # Kill monkey processes
-        adb.kill_monkey(device_id)
-
-        # Terminate process
-        process.terminate()
-        process.wait(timeout=timeout)
-        
-        if process.poll() is None:
-            process.kill()
-            process.wait(timeout=2.0)
-
-        self._cleanup_device(device_id)
         logger.info(f"Stopped script for device {device_id}")
-        return True
+        return result
 
     def is_running(self, device_id: str) -> bool:
         """Check if a device is running a script"""
-        if device_id not in self._running_scripts:
-            return False
-
-        process = self._running_scripts[device_id]
-        is_alive = process.poll() is None
-
-        if not is_alive:
-            self._cleanup_device(device_id)
-
-        return is_alive
+        return self._script_runner.is_running(device_id)
 
     def get_running_devices(self) -> list[str]:
         """Get list of devices currently running scripts"""
-        running_devices = []
-        
-        for device_id in list(self._running_scripts.keys()):
-            if self.is_running(device_id):
-                running_devices.append(device_id)
-        
-        return running_devices
+        return self._script_runner.get_running_devices()
 
     def shutdown_all(self) -> dict:
         """Shutdown all running processes"""
-        running_devices = list(self._running_scripts.keys())
-        
-        if not running_devices:
-            return {"total": 0, "stopped": [], "failed": []}
-
-        stopped_devices = []
-        failed_devices = []
-        
-        for device_id in running_devices:
-            if self.stop(device_id, timeout=3.0):
-                stopped_devices.append(device_id)
-            else:
-                failed_devices.append(device_id)
-
-        return {
-            "total": len(running_devices),
-            "stopped": stopped_devices,
-            "failed": failed_devices
-        }
-
-    def _cleanup_device(self, device_id: str):
-        """Clean up device execution resources"""
-        if device_id in self._running_scripts:
-            del self._running_scripts[device_id]
-            logger.debug(f"Cleaned up resources for device {device_id}")
+        return self._script_runner.shutdown_all()
 
 
 # Global executor instance

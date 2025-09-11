@@ -8,8 +8,9 @@ from typing import List
 from fastapi import APIRouter, HTTPException
 from loguru import logger
 
-from ..service import db, script_manager
-from ..models import Script
+from ..service.database import db
+from ..service.script import script_manager
+from ..models.script import Script
 from ..models.api import ScriptListResponse, ScriptDetailResponse
 
 router = APIRouter()

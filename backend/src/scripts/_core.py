@@ -4,49 +4,65 @@ Provides common functions and utilities that can be used by all scripts
 """
 
 import sys
-import os
-from typing import Tuple, Optional
+from datetime import datetime
+from enum import Enum
+from typing import Tuple, Optional, TYPE_CHECKING
 
-# Add the src directory to path to import modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from ..libs.adb import adb
+from ..libs import image
+from ..libs.time_provider import create_log_message
+from ..service.database import Database
 
-from libs import adb, image
+# Import ScriptContext only for type hints to avoid circular imports
+if TYPE_CHECKING:
+    from ..service.script_runner import ScriptContext
 
-# Simple logging function for CLI scripts
+# Simple logging function for CLI scripts and direct execution
 def write_log(device_id: str, action: str, index: Optional[str] = None):
     """Write simple formatted log entry: [Time]: [Action] [Index]"""
-    import sys
-    from typing import Optional
-    
-    # Import the time formatting utilities
-    try:
-        from libs.time_provider import create_log_message
-    except ImportError:
-        # Fallback if import fails
-        from datetime import datetime
-        def create_log_message(action: str, index: Optional[str] = None) -> str:
-            now = datetime.now()
-            time_str = f"[{now.strftime('%I:%M:%S %p')}]"
-            if index:
-                return f"{time_str}: {action} [{index}]"
-            else:
-                return f"{time_str}: {action}"
-    
     # Create formatted log message
     log_message = create_log_message(action, index)
     
     # Always output to console for shell/subprocess visibility
     print(log_message, file=sys.stdout, flush=True)
     
-    # Try to also write to database if available
-    try:
-        from service.database import Database
-        db = Database()
-        # Store the formatted message directly in the database
-        db.write_simple_log(device_id, log_message)
-    except Exception:
-        # Database unavailable - console output is sufficient
-        pass
+    # Write to database
+    db = Database()
+    db.write_simple_log(device_id, log_message)
+
+
+def check_should_stop(context: Optional["ScriptContext"] = None) -> bool:
+    """Check if script should stop execution (for direct execution)"""
+    if context and hasattr(context, 'should_stop'):
+        return context.should_stop()
+    return False
+
+
+def sleep_with_check(seconds: float, context: Optional["ScriptContext"] = None, device_id: Optional[str] = None):
+    """Sleep with periodic checks for stop signal"""
+    import time
+    
+    if seconds <= 0:
+        return
+    
+    # For short sleeps, just sleep normally
+    if seconds <= 1.0:
+        time.sleep(seconds)
+        return
+    
+    # For longer sleeps, check stop signal periodically
+    check_interval = 0.5
+    elapsed = 0.0
+    
+    while elapsed < seconds:
+        if check_should_stop(context):
+            if device_id:
+                write_log(device_id, "Sleep interrupted", "execution stopped")
+            break
+        
+        sleep_time = min(check_interval, seconds - elapsed)
+        time.sleep(sleep_time)
+        elapsed += sleep_time
 
 
 # Convenience functions for common log actions
@@ -75,12 +91,11 @@ def log_loop_iteration(device_id: str, current: int, total: int):
     write_log(device_id, "Loop", f"{current}/{total}")
 
 
-def log_waiting(device_id: str, seconds: float):
-    """Log: [Time]: Waiting [x]s"""
+def log_waiting(device_id: str, seconds: float, context: Optional["ScriptContext"] = None):
+    """Log: [Time]: Waiting [x]s and sleep with stop check"""
     write_log(device_id, "Waiting", f"{seconds}s")
+    sleep_with_check(seconds, context, device_id)
 
-
-from enum import Enum
 
 class KeyCode(Enum):
     UNKNOWN         = 0

@@ -12,7 +12,8 @@ from typing import Any, Dict, List, Optional
 from loguru import logger
 
 from ..libs.time_provider import local_now_iso, create_log_message
-from ..models import Device, DeviceStatus, Script, GameOptions
+from ..models.device import Device, DeviceStatus
+from ..models.script import Script, GameOptions
 
 
 class Database:
@@ -20,7 +21,13 @@ class Database:
 
     def __init__(self, data_dir: str = "src/data"):
         # Database operations will use the direct logger
-        self.data_dir = Path(data_dir)
+        # Convert to absolute path to avoid working directory issues
+        if not Path(data_dir).is_absolute():
+            # Get the backend directory (parent of src)
+            backend_dir = Path(__file__).parent.parent.parent
+            self.data_dir = backend_dir / data_dir
+        else:
+            self.data_dir = Path(data_dir)
         self.devices_file = self.data_dir / "devices.json"
         self.scripts_file = self.data_dir / "scripts.json"
         self.logs_file = self.data_dir / "logs.json"
@@ -267,18 +274,50 @@ class Database:
         """Load device logs from JSON file"""
         try:
             with open(self.logs_file, "r") as f:
-                return json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError) as e:
-            logger.error(f"Failed to load device logs: {e}")
+                content = f.read().strip()
+                if not content:
+                    logger.warning("Device logs file is empty, initializing with empty dict")
+                    return {}
+                return json.loads(content)
+        except FileNotFoundError:
+            logger.info("Device logs file not found, initializing with empty dict")
+            return {}
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse device logs JSON: {e}")
+            # Try to backup corrupted file
+            try:
+                backup_file = self.logs_file.with_suffix('.backup')
+                self.logs_file.rename(backup_file)
+                logger.info(f"Corrupted logs file backed up to {backup_file}")
+            except Exception as backup_error:
+                logger.error(f"Failed to backup corrupted logs file: {backup_error}")
+            return {}
+        except Exception as e:
+            logger.error(f"Unexpected error loading device logs: {e}")
             return {}
 
     def _save_device_logs(self, logs_data: Dict[str, List[Dict[str, Any]]]) -> None:
-        """Save device logs to JSON file"""
+        """Save device logs to JSON file with atomic write"""
         try:
-            with open(self.logs_file, "w") as f:
+            # Write to temporary file first, then rename for atomic operation
+            temp_file = self.logs_file.with_suffix('.tmp')
+            
+            with open(temp_file, "w") as f:
                 json.dump(logs_data, f, indent=2, default=str)
+                f.flush()
+            
+            # Atomic rename
+            temp_file.replace(self.logs_file)
+            
         except Exception as e:
             logger.error(f"Failed to save device logs: {e}")
+            # Clean up temp file if it exists
+            temp_file = self.logs_file.with_suffix('.tmp')
+            if temp_file.exists():
+                try:
+                    temp_file.unlink()
+                except Exception:
+                    pass
 
     def write_log(self, device_id: str, action: str, index: Optional[str] = None) -> None:
         """Write formatted log entry for specific device: [Time]: [Action] [Index]"""

@@ -11,8 +11,10 @@ from loguru import logger
 from pydantic import BaseModel
 
 from ..libs.time_provider import local_now_iso
-from ..service import adb, db
-from ..models import Device, DeviceStatus, GameOptions
+from ..libs.adb import adb
+from ..service.database import db
+from ..models.device import Device, DeviceStatus
+from ..models.script import GameOptions
 from ..models.api import DeviceDetailResponse, DeviceLogsResponse
 
 router = APIRouter()

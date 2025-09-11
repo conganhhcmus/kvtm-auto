@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 
 from loguru import logger
 
-from ..models import Script
+from ..models.script import Script
 
 
 class ScriptManager:

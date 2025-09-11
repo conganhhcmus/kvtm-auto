@@ -12,7 +12,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from loguru import logger
 
-from .api import devices, execute, scripts
+from .api.devices import router as devices_router
+from .api.execute import router as execute_router
+from .api.scripts import router as scripts_router
 from .libs.time_provider import GMT_PLUS_7
 from .service.executor import executor
 
@@ -101,9 +103,9 @@ async def root():
 
 
 # Include API routers
-app.include_router(devices.router, prefix="/api/devices", tags=["devices"])
-app.include_router(scripts.router, prefix="/api/scripts", tags=["scripts"])
-app.include_router(execute.router, prefix="/api/execute", tags=["execute"])
+app.include_router(devices_router, prefix="/api/devices", tags=["devices"])
+app.include_router(scripts_router, prefix="/api/scripts", tags=["scripts"])
+app.include_router(execute_router, prefix="/api/execute", tags=["execute"])
 
 
 # Development server

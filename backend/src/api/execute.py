@@ -9,8 +9,10 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from loguru import logger
 
 from ..models.api import StartRequest, StartResponse, StopRequest, StopResponse, StopAllResponse
-from ..models import DeviceStatus, GameOptions
-from ..service import db, executor
+from ..models.device import DeviceStatus
+from ..models.script import GameOptions
+from ..service.database import db
+from ..service.executor import executor
 
 router = APIRouter()
 
