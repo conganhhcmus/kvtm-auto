@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { deviceApi, scriptApi, GameOptions } from '@/api'
+import { deviceApi, scriptApi, GameOptions, ScriptResponse } from '@/api'
 import { Play, Square, ChevronDown, ChevronUp, MonitorOff, ScrollText } from 'lucide-react'
 import DeviceDetailModal from '@/components/DeviceDetailModal'
 import DeviceLogModal from '@/components/DeviceLogModal'
@@ -16,12 +16,7 @@ interface Device {
     current_script?: string
 }
 
-interface Script {
-    id: string
-    name: string
-    description?: string
-    recommend: boolean
-}
+// Using ScriptResponse interface from api.ts
 
 
 function App() {
@@ -48,7 +43,7 @@ function App() {
 
     const { data: scripts = [] } = useQuery({
         queryKey: ['scripts'],
-        queryFn: () => scriptApi.getScripts().then(res => res.data),
+        queryFn: () => scriptApi.getScripts().then(res => res.data.scripts),
     })
 
     const runMutation = useMutation({
@@ -136,7 +131,7 @@ function App() {
         }
     })
 
-    const scriptOptions = scripts.map((script: Script) => ({
+    const scriptOptions = scripts.map((script: ScriptResponse) => ({
         value: script.id,
         label: script.name,
         description: script.description,
@@ -181,7 +176,7 @@ function App() {
 
     const getScriptDisplayName = (scriptId: string | undefined): string => {
         if (!scriptId) return 'No script';
-        const script = scripts.find((s: Script) => s.id === scriptId);
+        const script = scripts.find((s: ScriptResponse) => s.id === scriptId);
         return script ? script.name : scriptId; // Fallback to ID if name not found
     }
 

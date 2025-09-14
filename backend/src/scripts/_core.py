@@ -50,7 +50,7 @@ class Core:
         """Execute callable with automatic stop checking"""
         if self._is_stop():
             self.log(self.device_id, "Action interrupted", "execution stopped")
-            return {"success": False, "message": "Script stopped by user"}
+            return False
 
         return func()
 
@@ -222,6 +222,13 @@ class Core:
         """Tap at specific coordinates with stop checking"""
         return self.run(lambda: adb.tap(x, y, self.device_id))
     
+    def tap_by_percent(self, x: int, y: int):
+        """Tap at specific coordinates with stop checking"""
+        w, h = self.get_screen_size()
+        x = round(w * x / 100)
+        y = round(h * y / 100)
+        return self.run(lambda: adb.tap(x, y, self.device_id))
+    
     def press_key(self, keycode):
         """Press a key using Android keycode with stop checking"""
         return self.run(lambda: adb.press_key(keycode, self.device_id))
@@ -249,3 +256,31 @@ class Core:
     
         return self.click_if_exists("o-lai.png")
     
+    def fail_result(self, message: str):
+        return {
+            "success": False,
+            "message": message
+        }
+    
+    def success_result(self, message: str):
+        return {
+            "success": True,
+            "message": message
+        }
+    
+    # auto core func
+    def open_chest(self):
+        can_open_chest = self.wait_for_image("ruong-bau.png", timeout = 3)
+
+        if can_open_chest:
+            self.tap_by_percent(35.0, 22.22)
+            self.sleep(0.5)
+            self.tap_by_percent(35.0, 22.22)
+            self.find_and_click("ruong-go.png", timeout = 3)
+            self.find_and_click("mo-ngay.png", timeout = 3)
+            for _ in range(10):
+                self.tap_by_percent(50.0, 62.22)
+                self.sleep(0.2)
+            self.close_all_popup()
+        
+        return self.success_result("Open chest successfully")

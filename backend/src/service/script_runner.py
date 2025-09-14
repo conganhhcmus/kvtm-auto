@@ -74,7 +74,7 @@ class ScriptRunner:
                     logger.error(f"Open game script failed: {e}")
                     db.write_script_log(device_id, f"ERROR: Open game failed: {e}")
                     return
-
+                
             # Execute main script with loops
             for loop_index in range(game_options.max_loops):
                 if _should_stop_execution(device_id):

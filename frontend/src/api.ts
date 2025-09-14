@@ -10,6 +10,29 @@ export interface GameOptions {
     loop_delay?: number
 }
 
+export interface ScriptResponse {
+    id: string
+    name: string
+    description?: string
+    order: number
+    recommend: boolean
+}
+
+export interface ScriptListResponse {
+    scripts: ScriptResponse[]
+    total: number
+}
+
+export interface ScriptDetailResponse {
+    id: string
+    name: string
+    description?: string
+    order: number
+    recommend: boolean
+    path?: string
+    last_modified?: string
+}
+
 export interface DeviceDetail {
     id: string
     device_name: string

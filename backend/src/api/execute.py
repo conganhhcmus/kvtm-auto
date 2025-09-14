@@ -3,10 +3,8 @@ Execute API endpoints for KVTM Auto
 Simplified script execution operations
 """
 
-from typing import List
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
-from loguru import logger
 
 from ..models.api import StartRequest, StartResponse, StopRequest, StopResponse, StopAllResponse
 from ..models.device import DeviceStatus
