@@ -3,66 +3,54 @@ Example script for KVTM Auto
 Demonstrates simple script usage with new logging format
 """
 
-import time
-
-from ..libs.adb import adb
-from ._core import KeyCode
-from ._core import write_log, log_script_started, log_waiting, check_should_stop
+import sys
+import json
+import argparse
+from ._core import Core, KeyCode
+from ..models.device import Device
+from ..models.script import GameOptions
 
 SCRIPT_META = {
-    "id": "example_script",
-    "name": "Example Script",
+    "id": "auto-vai-xanh-la",
+    "name": "Auto Vải Xanh Lá",
     "order": 1,
     "recommend": True,
-    "description": "Example script demonstrating simple core module usage"
+    "description": "Sản xuất vải xanh lá"
 }
 
 
-def main(device, game_options, context):
+def main(device: Device, game_options: GameOptions):
     """
     Main script function for both CLI and direct execution
-    
+
     Args:
         device: Device model containing device information
         game_options: GameOptions model containing game configuration
-        context: ScriptContext object for logging and control (None for CLI)
-    
+
     Returns:
         Dict with execution results
     """
+
+    # Create core helper with device.id
+    core = Core(device.id)
     
-    log_script_started(device.id, "Example Script")
-    
-    # Check if we should stop (for direct execution)
-    if check_should_stop(context):
-        return {"success": False, "message": "Script stopped by user"}
-    
-    write_log(device.id, "Running Script ....")
+    core.log("Script started")
     
     # Simulate some work with context-aware sleep
-    log_waiting(device.id, 1.0, context)
+    core.log("Waiting", "1.0s")
+    core.sleep(1.0)
     
-    # Check stop signal again
-    if check_should_stop(context):
-        return {"success": False, "message": "Script stopped by user"}
-    
-    write_log(device.id, "Script completed")
+    core.log("Script completed")
     
     return {
         "success": True,
-        "message": "Example script completed successfully"
+        "message": f"{SCRIPT_META['name']} completed successfully"
     }
 
 
 if __name__ == "__main__":
-    import sys
-    import json
-    import argparse
-    from ..models.device import Device
-    from ..models.script import GameOptions
-    
     # Parse command line arguments
-    parser = argparse.ArgumentParser(description="Example Script")
+    parser = argparse.ArgumentParser(description="Open Game Script")
     parser.add_argument("--device-id", required=True, help="Device ID")
     parser.add_argument("--options", required=True, help="Game options JSON")
     parser.add_argument("--loop-index", type=int, default=0, help="Loop index")
@@ -78,7 +66,7 @@ if __name__ == "__main__":
         device = Device(id=args.device_id, name=f"Device {args.device_id}")
         
         # Execute script
-        result = main(device, game_options, None)
+        result = main(device, game_options)
         
         # Exit with appropriate code
         if result.get("success", False):

@@ -3,18 +3,15 @@ Device API endpoints for KVTM Auto
 Handles device discovery and logging only
 """
 
-from datetime import datetime
-from typing import List, Optional
+from typing import List
 
 from fastapi import APIRouter, HTTPException
 from loguru import logger
-from pydantic import BaseModel
 
-from ..libs.time_provider import local_now_iso
+from ..libs.time_provider import time_provider
 from ..libs.adb import adb
 from ..service.database import db
 from ..models.device import Device, DeviceStatus
-from ..models.script import GameOptions
 from ..models.api import DeviceDetailResponse, DeviceLogsResponse
 
 router = APIRouter()
@@ -36,7 +33,7 @@ async def list_devices():
         else:
             logger.warning(f"Skipping invalid device object: {device}")
 
-    current_time = local_now_iso()
+    current_time = time_provider.local_now_iso()
     devices_to_save = []
 
     for device_id in connected_device_ids:

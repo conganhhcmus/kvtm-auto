@@ -13,9 +13,52 @@ Each ADB command creates a short-lived process that completes and cleans up auto
 import subprocess
 import time
 from typing import List, Optional, Tuple
+from enum import Enum
 
 EVENT = "/dev/input/event1"
 
+class KeyCode(Enum):
+    UNKNOWN         = 0
+    SOFT_LEFT       = 1
+    SOFT_RIGHT      = 2
+    HOME            = 3
+    BACK            = 4
+    CALL            = 5
+    ENDCALL         = 6
+    KEY_0           = 7
+    KEY_1           = 8
+    KEY_2           = 9
+    KEY_3           = 10
+    KEY_4           = 11
+    KEY_5           = 12
+    KEY_6           = 13
+    KEY_7           = 14
+    KEY_8           = 15
+    KEY_9           = 16
+    STAR            = 17
+    POUND           = 18
+    DPAD_UP         = 19
+    DPAD_DOWN       = 20
+    DPAD_LEFT       = 21
+    DPAD_RIGHT      = 22
+    DPAD_CENTER     = 23
+    VOLUME_UP       = 24
+    VOLUME_DOWN     = 25
+    POWER           = 26
+    CAMERA          = 27
+    CLEAR           = 28
+    #....
+    COMMA           = 55
+    PERIOD          = 56
+    ALT_LEFT        = 57
+    ALT_RIGHT       = 58
+    SHIFT_LEFT      = 59
+    SHIFT_RIGHT     = 60
+    TAB             = 61
+    SPACE           = 62
+    ENTER           = 66
+    DEL             = 67
+    ESC             = 111
 
 class ADB:
     """Android Debug Bridge operations for device control"""

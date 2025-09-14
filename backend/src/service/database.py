@@ -5,13 +5,12 @@ Database manager for device state persistence using JSON files with file locking
 import fcntl
 import json
 import time
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from loguru import logger
 
-from ..libs.time_provider import local_now_iso, create_log_message
+from ..libs.time_provider import time_provider
 from ..models.device import Device, DeviceStatus
 from ..models.script import Script, GameOptions
 
@@ -223,7 +222,7 @@ class Database:
         """Save Device model to JSON file"""
         devices = self._load_devices()
         device_dict = device.to_dict()
-        device_dict["last_updated"] = local_now_iso()
+        device_dict["last_updated"] = time_provider.local_now_iso()
 
         # Find existing device or create new one
         device_found = False
@@ -321,10 +320,10 @@ class Database:
 
     def write_log(self, device_id: str, action: str, index: Optional[str] = None) -> None:
         """Write formatted log entry for specific device: [Time]: [Action] [Index]"""
-        formatted_message = create_log_message(action, index)
-        self.write_simple_log(device_id, formatted_message)
+        formatted_message = time_provider.create_log_message(action, index)
+        self.write_script_log(device_id, formatted_message)
 
-    def write_simple_log(self, device_id: str, formatted_message: str) -> None:
+    def write_script_log(self, device_id: str, formatted_message: str) -> None:
         """Write pre-formatted log message for specific device"""
         logs_data = self._load_device_logs()
 
@@ -335,7 +334,7 @@ class Database:
         log_entry = {
             "message": formatted_message,
             "level": "INFO",
-            "created_at": local_now_iso()  # Keep for internal sorting/management
+            "created_at": time_provider.local_now_iso()  # Keep for internal sorting/management
         }
 
         logs_data[device_id].append(log_entry)
@@ -354,7 +353,7 @@ class Database:
             logs_data[device_id] = []
 
         log_entry = {
-            "timestamp": local_now_iso(),
+            "timestamp": time_provider.local_now_iso(),
             "level": level,
             "message": message,
         }
@@ -436,7 +435,7 @@ class Database:
         """Save Script model to JSON file"""
         scripts_data = self._load_scripts()
         script_dict = script.model_dump()
-        script_dict["last_updated"] = local_now_iso()
+        script_dict["last_updated"] = time_provider.local_now_iso()
 
         # Find existing script or create new one
         script_found = False
@@ -457,7 +456,7 @@ class Database:
         scripts_data = []
         for script in scripts:
             script_dict = script.model_dump()
-            script_dict["last_updated"] = local_now_iso()
+            script_dict["last_updated"] = time_provider.local_now_iso()
             scripts_data.append(script_dict)
 
         self._save_scripts(scripts_data)

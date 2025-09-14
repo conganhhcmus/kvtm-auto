@@ -4,138 +4,248 @@ Provides common functions and utilities that can be used by all scripts
 """
 
 import sys
-from datetime import datetime
-from enum import Enum
-from typing import Tuple, Optional, TYPE_CHECKING
+import time
+from typing import Optional
 
-from ..libs.adb import adb
-from ..libs import image
-from ..libs.time_provider import create_log_message
-from ..service.database import Database
+from ..libs.adb import adb, KeyCode
+from ..libs.image import image
+from ..libs.time_provider import time_provider
+from ..service.database import db
+from ..models.device import DeviceStatus
 
-# Import ScriptContext only for type hints to avoid circular imports
-if TYPE_CHECKING:
-    from ..service.script_runner import ScriptContext
 
-# Simple logging function for CLI scripts and direct execution
-def write_log(device_id: str, action: str, index: Optional[str] = None):
-    """Write simple formatted log entry: [Time]: [Action] [Index]"""
-    # Create formatted log message
-    log_message = create_log_message(action, index)
+class Core:
+    """
+    Core automation class that provides clean API for all script operations
+    Reduces device_id repetition with enhanced ADB shortcuts
+    """
+
+    def __init__(self, device_id: str):
+        self.device_id = device_id
+
+    def _is_stop(self):
+        """Check if script should stop execution by checking device status"""
+        if not self.device_id:
+            return False
+
+        device = db.get_device(self.device_id)
+        if not device:
+            return True  # Stop if device doesn't exist
+
+        # Stop if device status is not RUNNING
+        return device.device_status != DeviceStatus.RUNNING.value
+
+    def log(self, action: str, index: Optional[str] = None):
+        """Write script formatted log entry: [Time]: [Action] [Index]"""
+        # Create formatted log message
+        log_message = time_provider.create_log_message(action, index)
     
-    # Always output to console for shell/subprocess visibility
-    print(log_message, file=sys.stdout, flush=True)
+        # Always output to console for shell/subprocess visibility
+        print(log_message, file=sys.stdout, flush=True)
     
-    # Write to database
-    db = Database()
-    db.write_simple_log(device_id, log_message)
+        # Write to database
+        db.write_script_log(self.device_id, log_message)
 
+    def run(self, func):
+        """Execute callable with automatic stop checking"""
+        if self._is_stop():
+            self.log(self.device_id, "Action interrupted", "execution stopped")
+            return {"success": False, "message": "Script stopped by user"}
 
-def check_should_stop(context: Optional["ScriptContext"] = None) -> bool:
-    """Check if script should stop execution (for direct execution)"""
-    if context and hasattr(context, 'should_stop'):
-        return context.should_stop()
-    return False
+        return func()
 
+    def sleep(self, seconds:float):
+        if seconds <= 0:
+            return
 
-def sleep_with_check(seconds: float, context: Optional["ScriptContext"] = None, device_id: Optional[str] = None):
-    """Sleep with periodic checks for stop signal"""
-    import time
+        # For short sleeps, just sleep normally
+        if seconds <= 1.0:
+            time.sleep(seconds)
+            return
+
+        # For longer sleeps, check stop signal periodically
+        check_interval = 0.5
+        elapsed = 0.0
+
+        while elapsed < seconds:
+            if self._is_stop():
+                self.log("Sleep interrupted", "execution stopped")
+                break
+
+            sleep_time = min(check_interval, seconds - elapsed)
+            time.sleep(sleep_time)
+            elapsed += sleep_time
     
-    if seconds <= 0:
-        return
+    # Image detection methods
+    def find_and_click(self, asset_name: str, timeout: float = 10.0) -> bool:
+        """Find and click an asset image"""
+        """
+        Find an asset image on screen and click it if found
+
+        Args:
+            asset_name: Name of asset file (e.g., 'game.png')
+            device_id: Device ID for logging and stop checking
+            timeout: Maximum time to search for image
+
+        Returns:
+            True if image found and clicked, False otherwise
+        """
+        self.log("Looking for", asset_name)
+
+        start_time = time.time()
+
+        while time.time() - start_time < timeout:
+            if self._is_stop():
+                return False
+
+            # Capture screen and get template
+            screen_result = self.capture_screen()
+            if isinstance(screen_result, dict) and not screen_result.get("success", True):
+                return False
+
+            try:
+                template_bytes = image.read_asset_image_bytes(asset_name)
+                coordinates = image.get_coordinate(screen_result, template_bytes)
+
+                if coordinates:
+                    x, y = coordinates
+                    # self._log(f"Found {asset_name} at", f"({x}, {y})")
+                    click_result = self.tap(x, y)
+                    if isinstance(click_result, dict) and not click_result.get("success", True):
+                        return False
+                    # self._log("Clicked", asset_name)
+                    return True
+
+            except FileNotFoundError:
+                self.log("Asset not found", asset_name)
+                return False
+            except Exception as e:
+                self.log(f"Error finding {asset_name}", str(e))
+                return False
+
+            self.sleep(0.5)
+
+        self.log("Timeout looking for", asset_name)
+        return False
+
+    def wait_for_image(self, asset_name: str, timeout: float = 10.0) -> bool:
+        """Wait for an asset image to appear"""
+        """
+        Wait for an asset image to appear on screen
+
+        Args:
+            asset_name: Name of asset file (e.g., 'game.png')
+            device_id: Device ID for logging and stop checking
+            timeout: Maximum time to wait for image
+
+        Returns:
+            True if image found within timeout, False otherwise
+        """
+        self.log("Waiting for", asset_name)
+
+        start_time = time.time()
+
+        while time.time() - start_time < timeout:
+            if self._is_stop():
+                return False
+
+            # Capture screen and get template
+            screen_result = self.capture_screen()
+            if isinstance(screen_result, dict) and not screen_result.get("success", True):
+                return False
+
+            try:
+                template_bytes = image.read_asset_image_bytes(asset_name)
+                coordinates = image.get_coordinate(screen_result, template_bytes)
+
+                if coordinates:
+                    # self._log("Found", asset_name)
+                    return True
+
+            except FileNotFoundError:
+                self.log("Asset not found", asset_name)
+                return False
+            except Exception as e:
+                self.log(f"Error waiting for {asset_name}", str(e))
+                return False
+
+            self.sleep(0.5)
+
+        self.log("Timeout waiting for", asset_name)
+        return False
+
+
+    def click_if_exists(self, asset_name: str) -> bool:
+        """Click an asset image if it exists"""
+        """ 
+        Click an asset image if it exists on screen, continue if not found
+
+        Args:
+            asset_name: Name of asset file (e.g., 'game.png')
+            device_id: Device ID for logging and stop checking
+
+        Returns:
+            True if image found and clicked, False if not found (not an error)
+        """
+        if self._is_stop():
+            return False
+
+        # Capture screen and get template
+        screen_result = self.capture_screen()
+        if isinstance(screen_result, dict) and not screen_result.get("success", True):
+            return False
+
+        try:
+            template_bytes = image.read_asset_image_bytes(asset_name)
+            coordinates = image.get_coordinate(screen_result, template_bytes)
+
+            if coordinates:
+                x, y = coordinates
+                # self._log("Found and clicking", asset_name)
+                click_result = self.tap(x, y)
+                if isinstance(click_result, dict) and not click_result.get("success", True):
+                    return False
+                return True
+            else:
+                self.log("Not found", asset_name)
+                return False
+
+        except FileNotFoundError:
+            self.log("Asset not found", asset_name)
+            return False
+        except Exception as e:
+            self.log(f"Error checking {asset_name}", str(e))
+            return False
     
-    # For short sleeps, just sleep normally
-    if seconds <= 1.0:
-        time.sleep(seconds)
-        return
+    # ADB shortcut methods
+    def tap(self, x: int, y: int):
+        """Tap at specific coordinates with stop checking"""
+        return self.run(lambda: adb.tap(x, y, self.device_id))
     
-    # For longer sleeps, check stop signal periodically
-    check_interval = 0.5
-    elapsed = 0.0
+    def press_key(self, keycode):
+        """Press a key using Android keycode with stop checking"""
+        return self.run(lambda: adb.press_key(keycode, self.device_id))
     
-    while elapsed < seconds:
-        if check_should_stop(context):
-            if device_id:
-                write_log(device_id, "Sleep interrupted", "execution stopped")
-            break
-        
-        sleep_time = min(check_interval, seconds - elapsed)
-        time.sleep(sleep_time)
-        elapsed += sleep_time
-
-
-# Convenience functions for common log actions
-def log_run_open_game(device_id: str):
-    """Log: [Time]: Run Open Game"""
-    write_log(device_id, "Run Open Game")
-
-
-def log_run_script(device_id: str, times: int):
-    """Log: [Time]: Run Script [x] times"""
-    write_log(device_id, "Run Script", f"{times} times")
-
-
-def log_script_started(device_id: str, script_name: str):
-    """Log: [Time]: Script started [script_name]"""
-    write_log(device_id, "Script started", script_name)
-
-
-def log_script_completed(device_id: str):
-    """Log: [Time]: Script completed"""
-    write_log(device_id, "Script completed")
-
-
-def log_loop_iteration(device_id: str, current: int, total: int):
-    """Log: [Time]: Loop [x/y]"""
-    write_log(device_id, "Loop", f"{current}/{total}")
-
-
-def log_waiting(device_id: str, seconds: float, context: Optional["ScriptContext"] = None):
-    """Log: [Time]: Waiting [x]s and sleep with stop check"""
-    write_log(device_id, "Waiting", f"{seconds}s")
-    sleep_with_check(seconds, context, device_id)
-
-
-class KeyCode(Enum):
-    UNKNOWN         = 0
-    SOFT_LEFT       = 1
-    SOFT_RIGHT      = 2
-    HOME            = 3
-    BACK            = 4
-    CALL            = 5
-    ENDCALL         = 6
-    KEY_0           = 7
-    KEY_1           = 8
-    KEY_2           = 9
-    KEY_3           = 10
-    KEY_4           = 11
-    KEY_5           = 12
-    KEY_6           = 13
-    KEY_7           = 14
-    KEY_8           = 15
-    KEY_9           = 16
-    STAR            = 17
-    POUND           = 18
-    DPAD_UP         = 19
-    DPAD_DOWN       = 20
-    DPAD_LEFT       = 21
-    DPAD_RIGHT      = 22
-    DPAD_CENTER     = 23
-    VOLUME_UP       = 24
-    VOLUME_DOWN     = 25
-    POWER           = 26
-    CAMERA          = 27
-    CLEAR           = 28
-    #....
-    COMMA           = 55
-    PERIOD          = 56
-    ALT_LEFT        = 57
-    ALT_RIGHT       = 58
-    SHIFT_LEFT      = 59
-    SHIFT_RIGHT     = 60
-    TAB             = 61
-    SPACE           = 62
-    ENTER           = 66
-    DEL             = 67
-    ESC             = 111
+    def open_app(self, package_name: str):
+        """Open an app by package name with stop checking"""
+        return self.run(lambda: adb.open_app(package_name, self.device_id))
+    
+    def close_app(self, package_name: str):
+        """Close an app by package name with stop checking"""
+        return self.run(lambda: adb.close_app(package_name, self.device_id))
+    
+    def capture_screen(self):
+        """Capture device screen with stop checking"""
+        return self.run(lambda: adb.capture_screen(self.device_id))
+    
+    def get_screen_size(self):
+        """Get device screen dimensions with stop checking"""
+        return self.run(lambda: adb.get_screen_size(self.device_id))
+    
+    def close_all_popup(self):
+        for _ in range(10):
+            self.press_key(KeyCode.BACK.value)
+            self.sleep(0.2)
+    
+        return self.click_if_exists("o-lai.png")
+    

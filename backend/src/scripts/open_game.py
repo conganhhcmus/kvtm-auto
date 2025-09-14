@@ -2,12 +2,13 @@
 Open game script for KVTM Auto
 Handles opening the game application with simple logging
 """
-
-import time
-
-from ..libs.adb import adb
-from ._core import KeyCode
-from ._core import write_log, log_run_open_game, log_waiting, check_should_stop
+import sys
+import json
+import argparse
+from ._core import Core
+from ..libs.adb import KeyCode
+from ..models.device import Device
+from ..models.script import GameOptions
 
 SCRIPT_META = {
     "id": "open_game",
@@ -18,68 +19,58 @@ SCRIPT_META = {
 }
 
 
-def main(device, game_options, context):
+def main(device: Device, game_options: GameOptions):
     """
-    Opens the game application on the device
-    
+    Opens the game application on the device using Core helper
+
     Args:
         device: Device model containing device information
         game_options: GameOptions model containing game configuration
-        context: ScriptContext object for logging and control (None for CLI)
-    
+
     Returns:
         Dict with execution results
     """
+
+    # Create core helper with device.id
+    core = Core(device.id)
     
-    log_run_open_game(device.id)
-    
-    # Check if we should stop
-    if check_should_stop(context):
-        return {"success": False, "message": "Script stopped by user"}
+    core.log("Run Open Game")
     
     game_package = "vn.kvtm.js"
     
     # Close the app if it's running
-    write_log(device.id, "Closing app if running")
-    adb.close_app(game_package, device.id)
-
-    # Check stop signal
-    if check_should_stop(context):
-        return {"success": False, "message": "Script stopped by user"}
+    close_result = core.close_app(game_package)
+    if isinstance(close_result, dict) and not close_result.get("success", True):
+        return close_result
 
     # Press HOME key to ensure we're at the home screen
-    write_log(device.id, "Pressing HOME key")
-    adb.press_key(KeyCode.HOME.value, device.id)
-
-    # Check stop signal
-    if check_should_stop(context):
-        return {"success": False, "message": "Script stopped by user"}
+    home_result = core.press_key(KeyCode.HOME.value)
+    if isinstance(home_result, dict) and not home_result.get("success", True):
+        return home_result
 
     # Open the game application
-    write_log(device.id, "Opening game")
-    adb.open_app(game_package, device.id)
+    open_result = core.open_app(game_package)
+    if isinstance(open_result, dict) and not open_result.get("success", True):
+        return open_result
     
-    # Wait for game to load (configurable timing) with context-aware sleep
-    wait_time = getattr(game_options, 'game_load_wait', 5)
-    log_waiting(device.id, wait_time, context)
+    core.find_and_click("game.png")
+    core.sleep(10)
+
+    game_loaded = core.close_all_popup() and core.wait_for_image("shop-gem.png", 5)
     
-    # Final check
-    if check_should_stop(context):
-        return {"success": False, "message": "Script stopped by user"}
-    
-    return {
-        "success": True,
-        "message": "Game opened successfully"
-    }
+    if game_loaded:
+        return {
+            "success": True,
+            "message": f"{SCRIPT_META['name']} successfully"
+        }
+    else:
+        return {
+            "success": False,
+            "message": f"{SCRIPT_META['name']} failure"
+        }
 
 
 if __name__ == "__main__":
-    import sys
-    import json
-    import argparse
-    from ..models.device import Device
-    from ..models.script import GameOptions
-    
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Open Game Script")
     parser.add_argument("--device-id", required=True, help="Device ID")
@@ -97,7 +88,7 @@ if __name__ == "__main__":
         device = Device(id=args.device_id, name=f"Device {args.device_id}")
         
         # Execute script
-        result = main(device, game_options, None)
+        result = main(device, game_options)
         
         # Exit with appropriate code
         if result.get("success", False):

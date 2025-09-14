@@ -15,7 +15,6 @@ from loguru import logger
 from .api.devices import router as devices_router
 from .api.execute import router as execute_router
 from .api.scripts import router as scripts_router
-from .libs.time_provider import GMT_PLUS_7
 from .service.executor import executor
 
 
