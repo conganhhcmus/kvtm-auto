@@ -3,22 +3,7 @@ import threading
 import time
 from datetime import datetime
 
-
-class Device:
-    def __init__(self, serial):
-        self.serial = serial
-        self.status = "available"  # available, busy, offline
-        self.last_seen = datetime.now()
-        self.logs = []
-        self.current_script = None
-
-    def to_dict(self):
-        return {
-            "id": self.serial,
-            "status": self.status,
-            "last_seen": self.last_seen.isoformat(),
-            "current_script": self.current_script,
-        }
+from models.device import Device
 
 
 class DeviceManager:

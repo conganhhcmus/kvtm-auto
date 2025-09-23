@@ -1,26 +1,10 @@
 import json
 import subprocess
-import uuid
+import threading
 from datetime import datetime
 
-
-class RunningScript:
-    def __init__(self, device_id, script_id, process):
-        self.id = str(uuid.uuid4())
-        self.device_id = device_id
-        self.script_id = script_id
-        self.process = process
-        self.start_time = datetime.now()
-        self.status = "running"
-
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "device_id": self.device_id,
-            "script_id": self.script_id,
-            "start_time": self.start_time.isoformat(),
-            "status": self.status,
-        }
+from models.execution import RunningScript
+from models.game_options import GameOptions
 
 
 class ExecutionManager:
@@ -28,7 +12,9 @@ class ExecutionManager:
         self.running_scripts = {}
         self.device_manager = device_manager
 
-    def start_script(self, device_id, script_id, script_path, game_options=None):
+    def start_script(
+        self, device_id, script_id, script_path, game_options=None
+    ):
         device = self.device_manager.get_device(device_id)
         if not device:
             raise ValueError("Device not found")
@@ -36,25 +22,50 @@ class ExecutionManager:
             raise ValueError("Device is busy")
 
         try:
-            # Prepare command arguments
-            cmd_args = ["python", script_path, device_id]
+            # Prepare command arguments - use unbuffered Python output
+            cmd_args = ["python", "-u", script_path, device_id]
 
-            # Add game_options as JSON string if provided
+            # Convert game_options to GameOptions model if it's a dict
             if game_options:
-                cmd_args.append(json.dumps(game_options))
+                if isinstance(game_options, dict):
+                    game_options_obj = GameOptions.from_dict(game_options)
+                elif isinstance(game_options, GameOptions):
+                    game_options_obj = game_options
+                else:
+                    raise ValueError(
+                        "game_options must be a dict or GameOptions instance"
+                    )
+
+                cmd_args.append(json.dumps(game_options_obj.to_dict()))
 
             process = subprocess.Popen(
                 cmd_args,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stderr=subprocess.STDOUT,  # Redirect stderr to stdout
                 text=True,
+                bufsize=1,  # Line buffering
+                universal_newlines=True,
             )
 
             device.status = "busy"
             device.current_script = script_id
 
+            # Add start log
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            start_log = f"[{timestamp}]: Script {script_id} started"
+            device.add_log(start_log)
+
             running_script = RunningScript(device_id, script_id, process)
             self.running_scripts[running_script.id] = running_script
+
+            # Start log capture thread
+            log_thread = threading.Thread(
+                target=self._capture_logs,
+                args=(running_script, device),
+                daemon=True,
+            )
+            log_thread.start()
+            running_script.log_thread = log_thread
 
             return running_script
         except Exception as e:
@@ -71,8 +82,17 @@ class ExecutionManager:
             running_script.process.terminate()
             running_script.process.wait(timeout=5)
 
+            # Wait for log thread to finish (with timeout)
+            if hasattr(running_script, "log_thread"):
+                running_script.log_thread.join(timeout=2)
+
             device.status = "available"
             device.current_script = None
+
+            # Add completion log
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            completion_log = f"[{timestamp}]: Script execution stopped"
+            device.add_log(completion_log)
 
             del self.running_scripts[execution_id]
             return True
@@ -91,3 +111,37 @@ class ExecutionManager:
                 errors.append(f"Execution {execution_id}: {str(e)}")
 
         return stopped_count, errors
+
+    def _capture_logs(self, running_script, device):
+        """Capture subprocess output and append to device logs in real-time"""
+        try:
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            debug_log = f"[{timestamp}]: Log capture thread started"
+            device.add_log(debug_log)
+
+            while running_script.process.poll() is None:
+                output = running_script.process.stdout.readline()
+                if output:
+                    # Format log with timestamp
+                    timestamp = datetime.now().strftime("%H:%M:%S")
+                    log_entry = f"[{timestamp}]: {output.strip()}"
+                    device.add_log(log_entry)
+
+            # Capture any remaining output
+            remaining_output = running_script.process.stdout.read()
+            if remaining_output:
+                for line in remaining_output.splitlines():
+                    if line.strip():
+                        timestamp = datetime.now().strftime("%H:%M:%S")
+                        log_entry = f"[{timestamp}]: {line.strip()}"
+                        device.add_log(log_entry)
+
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            completion_log = f"[{timestamp}]: Log capture completed"
+            device.add_log(completion_log)
+
+        except Exception as e:
+            # Log capture error to device logs
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            error_log = f"[{timestamp}]: Log capture error: {str(e)}"
+            device.add_log(error_log)

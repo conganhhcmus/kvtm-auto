@@ -6,8 +6,6 @@ export interface GameOptions {
     open_game?: boolean
     open_chest?: boolean
     sell_items?: boolean
-    max_loops?: number
-    loop_delay?: number
 }
 
 export interface ScriptResponse {
@@ -105,6 +103,10 @@ export const deviceApi = {
 export const scriptApi = {
     getScripts: () => api.get('/scripts'),
     getScript: (scriptId: string) => api.get(`/scripts/${scriptId}`),
+}
+
+// Execute API
+export const executeApi = {
     runScript: (scriptId: string, deviceId: string, gameOptions?: GameOptions) =>
         api.post('/execute/start', {
             device_id: deviceId,

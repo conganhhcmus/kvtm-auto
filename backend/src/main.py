@@ -1,8 +1,9 @@
 from flask import Flask, jsonify
 from flask_cors import CORS
+
 from apis.device_apis import device_bp
-from apis.script_apis import script_bp
 from apis.execution_apis import execution_bp
+from apis.script_apis import script_bp
 from apis.system_apis import system_bp
 
 app = Flask(__name__)
@@ -16,9 +17,10 @@ app.register_blueprint(execution_bp)
 app.register_blueprint(system_bp)
 
 
-@app.route('/')
+@app.route("/")
 def hello_world():
     return jsonify(message="Hello, World!")
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=3001, debug=True)

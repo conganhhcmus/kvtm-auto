@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { deviceApi, scriptApi, GameOptions, ScriptResponse } from '@/api'
+import { deviceApi, scriptApi, executeApi, GameOptions, ScriptResponse } from '@/api'
 import { Play, Square, ChevronDown, ChevronUp, MonitorOff, ScrollText } from 'lucide-react'
 import DeviceDetailModal from '@/components/DeviceDetailModal'
 import DeviceLogModal from '@/components/DeviceLogModal'
@@ -65,7 +65,7 @@ function App() {
 
             for (const deviceId of selectedDevices) {
                 try {
-                    const response = await scriptApi.runScript(selectedScript, deviceId, gameOptions)
+                    const response = await executeApi.runScript(selectedScript, deviceId, gameOptions)
                     results.push({ deviceId, success: true, data: response.data })
                     // Store execution_id for this device
                     if (response.data.execution_id) {
@@ -107,7 +107,7 @@ function App() {
     })
 
     const stopAllMutation = useMutation({
-        mutationFn: () => scriptApi.stopAllDevices(),
+        mutationFn: () => executeApi.stopAllDevices(),
         onSuccess: (response) => {
             // Immediately invalidate and refetch for faster UI update
             queryClient.invalidateQueries({ queryKey: ['devices'] })
@@ -132,7 +132,7 @@ function App() {
     })
 
     const stopDeviceMutation = useMutation({
-        mutationFn: (executionId: string) => scriptApi.stopScript(executionId),
+        mutationFn: (executionId: string) => executeApi.stopScript(executionId),
         onSuccess: (_, executionId) => {
             // Immediately invalidate and refetch for faster UI update
             queryClient.invalidateQueries({ queryKey: ['devices'] })

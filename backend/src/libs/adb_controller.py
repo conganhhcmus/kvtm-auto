@@ -3,7 +3,6 @@ import subprocess
 import tempfile
 
 import cv2
-import numpy as np
 import pytesseract
 from PIL import Image
 
@@ -20,17 +19,27 @@ class _MultiTouchController:
     @staticmethod
     def _get_touch_device(serial):
         """Get touch device path for the given device serial"""
-        cmd = ['adb', '-s', serial, 'shell', 'getevent -p']
+        cmd = ["adb", "-s", serial, "shell", "getevent -p"]
         result = subprocess.run(cmd, capture_output=True, text=True)
         for line in result.stdout.splitlines():
-            if 'ABS_MT_POSITION_X' in line:
+            if "ABS_MT_POSITION_X" in line:
                 return line.split()[-1]  # Returns device path like /dev/input/event3
         raise RuntimeError("Touch device not found")
 
     @staticmethod
     def _send_touch_event(serial, device, event_type, event_code, value):
         """Send touch event to device"""
-        cmd = ['adb', '-s', serial, 'shell', 'sendevent', device, str(event_type), str(event_code), str(value)]
+        cmd = [
+            "adb",
+            "-s",
+            serial,
+            "shell",
+            "sendevent",
+            device,
+            str(event_type),
+            str(event_code),
+            str(value),
+        ]
         subprocess.run(cmd, check=True)
 
     def add_pointer(self, x, y):
@@ -39,7 +48,7 @@ class _MultiTouchController:
         self.next_pointer_id += 1
         self.pointers[pointer_id] = (x, y)
         # Send DOWN event with tracking ID
-        self._send_pointer_event('DOWN', pointer_id, x, y)
+        self._send_pointer_event("DOWN", pointer_id, x, y)
         return pointer_id
 
     def move_pointer(self, pointer_id, x, y):
@@ -47,14 +56,14 @@ class _MultiTouchController:
         if pointer_id not in self.pointers:
             raise ValueError("Invalid pointer ID")
         self.pointers[pointer_id] = (x, y)
-        self._send_pointer_event('MOVE', pointer_id, x, y)
+        self._send_pointer_event("MOVE", pointer_id, x, y)
 
     def remove_pointer(self, pointer_id):
         """Remove a touch pointer"""
         if pointer_id not in self.pointers:
             raise ValueError("Invalid pointer ID")
         x, y = self.pointers[pointer_id]
-        self._send_pointer_event('UP', pointer_id, x, y)
+        self._send_pointer_event("UP", pointer_id, x, y)
         del self.pointers[pointer_id]
 
     def _send_pointer_event(self, action, pointer_id, x, y):
@@ -62,18 +71,24 @@ class _MultiTouchController:
         # Event codes (may vary by device; common values)
         EV_ABS = 3
         ABS_MT_TRACKING_ID = 57  # Assign/remove tracking ID
-        ABS_MT_POSITION_X = 53   # X coordinate
-        ABS_MT_POSITION_Y = 54   # Y coordinate
-        SYN_REPORT = 0           # Synchronize events
+        ABS_MT_POSITION_X = 53  # X coordinate
+        ABS_MT_POSITION_Y = 54  # Y coordinate
+        SYN_REPORT = 0  # Synchronize events
 
-        if action == 'DOWN':
-            self._send_touch_event(self.serial, self.device, EV_ABS, ABS_MT_TRACKING_ID, pointer_id)
-        elif action == 'UP':
-            self._send_touch_event(self.serial, self.device, EV_ABS, ABS_MT_TRACKING_ID, -1)  # -1 to release
+        if action == "DOWN":
+            self._send_touch_event(
+                self.serial, self.device, EV_ABS, ABS_MT_TRACKING_ID, pointer_id
+            )
+        elif action == "UP":
+            self._send_touch_event(
+                self.serial, self.device, EV_ABS, ABS_MT_TRACKING_ID, -1
+            )  # -1 to release
 
         self._send_touch_event(self.serial, self.device, EV_ABS, ABS_MT_POSITION_X, x)
         self._send_touch_event(self.serial, self.device, EV_ABS, ABS_MT_POSITION_Y, y)
-        self._send_touch_event(self.serial, self.device, SYN_REPORT, 0, 0)  # Sync all pointers
+        self._send_touch_event(
+            self.serial, self.device, SYN_REPORT, 0, 0
+        )  # Sync all pointers
 
 
 class AdbController:
@@ -84,7 +99,8 @@ class AdbController:
     def tap(self, x, y):
         """Simulate a tap at (x, y)"""
         subprocess.run(
-            ["adb", "-s", self.serial, "shell", "input", "tap", str(x), str(y)], check=True
+            ["adb", "-s", self.serial, "shell", "input", "tap", str(x), str(y)],
+            check=True,
         )
 
     def capture_screen(self):
