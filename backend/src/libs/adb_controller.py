@@ -1,33 +1,93 @@
 import os
 import subprocess
-import tempfile
+import time
 
-import cv2
-import pytesseract
-from PIL import Image
+from enum import Enum
+from .image_controller import image_controller
+
+
+class EventCode(Enum):
+    EV_SYN = 0
+    EV_ABS = 3
+    ABS_MT_POSITION_X = 53
+    ABS_MT_POSITION_Y = 54
+    SYN_REPORT = 0
+    SYN_MT_REPORT = 2
+
+
+class KeyCode(Enum):
+    UNKNOWN = 0
+    SOFT_LEFT = 1
+    SOFT_RIGHT = 2
+    HOME = 3
+    BACK = 4
+    CALL = 5
+    ENDCALL = 6
+    KEY_0 = 7
+    KEY_1 = 8
+    KEY_2 = 9
+    KEY_3 = 10
+    KEY_4 = 11
+    KEY_5 = 12
+    KEY_6 = 13
+    KEY_7 = 14
+    KEY_8 = 15
+    KEY_9 = 16
+    STAR = 17
+    POUND = 18
+    DPAD_UP = 19
+    DPAD_DOWN = 20
+    DPAD_LEFT = 21
+    DPAD_RIGHT = 22
+    DPAD_CENTER = 23
+    VOLUME_UP = 24
+    VOLUME_DOWN = 25
+    POWER = 26
+    CAMERA = 27
+    CLEAR = 28
+    # ....
+    COMMA = 55
+    PERIOD = 56
+    ALT_LEFT = 57
+    ALT_RIGHT = 58
+    SHIFT_LEFT = 59
+    SHIFT_RIGHT = 60
+    TAB = 61
+    SPACE = 62
+    ENTER = 66
+    DEL = 67
+    ESC = 111
 
 
 class _MultiTouchController:
     """Private controller for managing multiple touch pointers on a device"""
 
-    def __init__(self, serial):
+    def __init__(self, serial, screen_width, screen_height):
         self.serial = serial
-        self.device = self._get_touch_device(serial)
-        self.pointers = {}  # {pointer_id: (x, y)}
+        self.device = (
+            "/dev/input/event2"  # Default touch device path for most emulators/devices
+        )
+        self.pointers = {}  # {pointer_id: (x, y, slot)}
+        self.slots = {}  # {slot: pointer_id} - track which pointer uses which slot
+        self.available_slots = list(range(10))  # Support up to 10 simultaneous touches
         self.next_pointer_id = 0
+        # BlueStacks Virtual Touch uses 0-32767 coordinate range
+        self.device_max_x = 32767
+        self.device_max_y = 32767
+        self.screen_width = screen_width
+        self.screen_height = screen_height
+
+    def _convert_to_device_coords(self, screen_x, screen_y):
+        """Convert screen coordinates to device coordinates for BlueStacks Virtual Touch"""
+        device_x = int((screen_x / self.screen_width) * self.device_max_x)
+        device_y = int((screen_y / self.screen_height) * self.device_max_y)
+        print(
+            f"Coordinate conversion: screen({screen_x},{screen_y}) -> device({device_x},{device_y})"
+        )
+        return device_x, device_y
 
     @staticmethod
-    def _get_touch_device(serial):
-        """Get touch device path for the given device serial"""
-        cmd = ["adb", "-s", serial, "shell", "getevent -p"]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        for line in result.stdout.splitlines():
-            if "ABS_MT_POSITION_X" in line:
-                return line.split()[-1]  # Returns device path like /dev/input/event3
-        raise RuntimeError("Touch device not found")
-
-    @staticmethod
-    def _send_touch_event(serial, device, event_type, event_code, value):
+    def _send_event(serial, device, event_type, event_code, value):
         """Send touch event to device"""
         cmd = [
             "adb",
@@ -40,154 +100,262 @@ class _MultiTouchController:
             str(event_code),
             str(value),
         ]
-        subprocess.run(cmd, check=True)
-
-    def add_pointer(self, x, y):
-        """Add a new touch pointer at the given coordinates"""
-        pointer_id = self.next_pointer_id
-        self.next_pointer_id += 1
-        self.pointers[pointer_id] = (x, y)
-        # Send DOWN event with tracking ID
-        self._send_pointer_event("DOWN", pointer_id, x, y)
-        return pointer_id
-
-    def move_pointer(self, pointer_id, x, y):
-        """Move an existing pointer to new coordinates"""
-        if pointer_id not in self.pointers:
-            raise ValueError("Invalid pointer ID")
-        self.pointers[pointer_id] = (x, y)
-        self._send_pointer_event("MOVE", pointer_id, x, y)
-
-    def remove_pointer(self, pointer_id):
-        """Remove a touch pointer"""
-        if pointer_id not in self.pointers:
-            raise ValueError("Invalid pointer ID")
-        x, y = self.pointers[pointer_id]
-        self._send_pointer_event("UP", pointer_id, x, y)
-        del self.pointers[pointer_id]
-
-    def _send_pointer_event(self, action, pointer_id, x, y):
-        """Send touch event for a specific pointer"""
-        # Event codes (may vary by device; common values)
-        EV_ABS = 3
-        ABS_MT_TRACKING_ID = 57  # Assign/remove tracking ID
-        ABS_MT_POSITION_X = 53  # X coordinate
-        ABS_MT_POSITION_Y = 54  # Y coordinate
-        SYN_REPORT = 0  # Synchronize events
-
-        if action == "DOWN":
-            self._send_touch_event(
-                self.serial, self.device, EV_ABS, ABS_MT_TRACKING_ID, pointer_id
-            )
-        elif action == "UP":
-            self._send_touch_event(
-                self.serial, self.device, EV_ABS, ABS_MT_TRACKING_ID, -1
-            )  # -1 to release
-
-        self._send_touch_event(self.serial, self.device, EV_ABS, ABS_MT_POSITION_X, x)
-        self._send_touch_event(self.serial, self.device, EV_ABS, ABS_MT_POSITION_Y, y)
-        self._send_touch_event(
-            self.serial, self.device, SYN_REPORT, 0, 0
-        )  # Sync all pointers
+        subprocess.run(
+            cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
 
 
 class AdbController:
+    # Assets directory relative to this file's location
+    ASSETS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets")
+
     def __init__(self, serial):
         self.serial = serial
-        self._multi_touch = _MultiTouchController(serial)
+        self.screen_width, self.screen_height = self._get_screen_size()
+        self._multi_touch = _MultiTouchController(
+            self.serial, self.screen_width, self.screen_height
+        )
+
+    def _get_screen_size(self):
+        """Get device screen size"""
+        try:
+            result = subprocess.run(
+                ["adb", "-s", self.serial, "shell", "wm", "size"],
+                capture_output=True,
+                check=True,
+                text=True,
+            )
+            # Output format: "Physical size: 1080x1920"
+            size_line = result.stdout.strip()
+            size_part = size_line.split(": ")[1]  # Get "1080x1920"
+            width, height = map(int, size_part.split("x"))
+            return width, height
+        except Exception as e:
+            print(f"Error getting screen size: {e}")
+            # Default fallback values
+            return 1080, 1920
+
+    def _resolve_asset_path(self, image_path):
+        """Resolve asset path. If just filename, prepend assets directory."""
+        if os.path.isabs(image_path) or os.sep in image_path:
+            # Already a path (absolute or relative with directory)
+            return image_path
+        else:
+            # Just a filename, look in assets directory
+            return os.path.join(self.ASSETS_DIR, image_path)
 
     def tap(self, x, y):
         """Simulate a tap at (x, y)"""
         subprocess.run(
             ["adb", "-s", self.serial, "shell", "input", "tap", str(x), str(y)],
             check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
         )
+
+    def tap_by_percent(self, percent_x, percent_y):
+        """Simulate a tap at percentage coordinates (0-100)"""
+        if not (0 <= percent_x <= 100 and 0 <= percent_y <= 100):
+            raise ValueError("Percentage coordinates must be between 0 and 100")
+
+        x = int(self.screen_width * percent_x / 100)
+        y = int(self.screen_height * percent_y / 100)
+        self.tap(x, y)
 
     def capture_screen(self):
-        """Capture device screen and return local file path"""
-        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
-            subprocess.run(
-                ["adb", "-s", self.serial, "shell", "screencap", "-p"],
-                stdout=tmp,
-                check=True,
-            )
-            return tmp.name
+        """Capture device screen as PNG bytes"""
+        result = subprocess.run(
+            ["adb", "-s", self.serial, "shell", "screencap", "-p"],
+            capture_output=True,
+            check=True,
+        )
+        return result.stdout
 
-    def find_image_on_screen(self, screenshot_path, template_path, threshold=0.8):
-        """Find template image in screenshot using OpenCV"""
-        screenshot = cv2.imread(screenshot_path, cv2.IMREAD_COLOR)
-        template = cv2.imread(template_path, cv2.IMREAD_COLOR)
-
-        if screenshot is None or template is None:
-            return None
-
-        result = cv2.matchTemplate(screenshot, template, cv2.TM_CCOEFF_NORMED)
-        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
-
-        if max_val >= threshold:
-            h, w = template.shape[:2]
-            center_x = max_loc[0] + w // 2
-            center_y = max_loc[1] + h // 2
-            return (center_x, center_y)
+    def find_image_on_screen(self, template_path, threshold=0.8, max_retries=3):
+        """Find template image on screen using bytes-based approach"""
+        for attempt in range(max_retries):
+            try:
+                screen_bytes = self.capture_screen()
+                template_bytes = image_controller.read_asset_image_bytes(template_path)
+                coords = image_controller.get_coordinate(
+                    screen_bytes, template_bytes, threshold
+                )
+                if coords:
+                    return coords
+                if attempt < max_retries - 1:
+                    time.sleep(0.5)  # Wait before retry
+            except Exception as e:
+                print(f"Error in find_image_on_screen (attempt {attempt + 1}): {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(0.5)  # Wait before retry
         return None
 
-    def find_text_on_screen(self, screenshot_path, target_text, lang="eng"):
-        """Find text position using OCR"""
-        img = Image.open(screenshot_path)
-        data = pytesseract.image_to_data(
-            img, lang=lang, output_type=pytesseract.Output.DICT
+    def click_image(self, template_path, threshold=0.8, max_retries=3):
+        """Click on a template image found on screen using bytes-based approach"""
+        for attempt in range(max_retries):
+            try:
+                screen_bytes = self.capture_screen()
+                template_bytes = image_controller.read_asset_image_bytes(template_path)
+                coords = image_controller.get_coordinate(
+                    screen_bytes, template_bytes, threshold
+                )
+
+                if coords:
+                    self.tap(*coords)
+                    return True
+                if attempt < max_retries - 1:
+                    time.sleep(0.5)  # Wait before retry
+            except Exception as e:
+                print(f"Error in click_image (attempt {attempt + 1}): {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(0.5)  # Wait before retry
+        return False
+
+    def click_text(self, target_text, lang="eng", max_retries=3):
+        """Click on text found on screen using bytes-based approach"""
+        for attempt in range(max_retries):
+            try:
+                screen_bytes = self.capture_screen()
+                coords = image_controller.find_text_in_image_bytes(
+                    screen_bytes, target_text, lang
+                )
+                if coords:
+                    self.tap(*coords)
+                    return True
+                if attempt < max_retries - 1:
+                    time.sleep(0.5)  # Wait before retry
+            except Exception as e:
+                print(f"Error in click_text (attempt {attempt + 1}): {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(0.5)  # Wait before retry
+        return False
+
+    def press_key(self, keycode):
+        """Press a key using Android keycode"""
+        subprocess.run(
+            ["adb", "-s", self.serial, "shell", "input", "keyevent", str(keycode)],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
         )
 
-        for i in range(len(data["text"])):
-            if target_text.lower() in data["text"][i].lower():
-                x = data["left"][i] + data["width"][i] // 2
-                y = data["top"][i] + data["height"][i] // 2
-                return (x, y)
-        return None
+    def close_app(self, package_name: str):
+        """Force stop an app by package name"""
+        subprocess.run(
+            ["adb", "-s", self.serial, "shell", "am", "force-stop", package_name],
+            check=True,
+        )
 
-    def click_image(self, template_path, threshold=0.8):
-        """Click on a template image found on screen"""
-        screenshot_path = self.capture_screen()
-        try:
-            coords = self.find_image_on_screen(
-                screenshot_path, template_path, threshold
+    def open_app(self, package_name: str):
+        """Open an app by package name"""
+        subprocess.run(
+            [
+                "adb",
+                "-s",
+                self.serial,
+                "shell",
+                "monkey",
+                "-p",
+                package_name,
+                "-c",
+                "android.intent.category.LAUNCHER",
+                "1",
+            ],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+    def kill_monkey(self):
+        """Kill all monkey processes on device"""
+        subprocess.run(
+            ["adb", "-s", self.serial, "shell", "pkill", "-f", "monkey"],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+    def sleep(self, duration):
+        """Sleep for a given duration in seconds"""
+        time.sleep(duration)
+
+    # High-level gesture methods
+
+    def drag(self, points, steps=5):
+        """
+        Smooth drag using interpolated points at maximum speed.
+
+        Args:
+            points: List of (x, y) coordinate tuples
+            steps: Number of interpolated points between each pair of points (default: 5)
+
+        Examples:
+            # Fast drag with fewer interpolation steps
+            controller.drag([(100, 100), (300, 300)], steps=3)
+
+            # Smooth drag with many interpolation steps
+            path = [(100, 100), (200, 100), (300, 200), (400, 300)]
+            controller.drag(path, steps=20)
+        """
+        if not isinstance(points, (list, tuple)):
+            raise ValueError("Points must be a list or tuple of coordinate pairs")
+
+        if len(points) < 2:
+            raise ValueError("Need at least 2 points for drag gesture")
+
+        # Generate interpolated points for smooth movement
+        interpolated_points = [points[0]]  # Start with first point
+        for i in range(len(points) - 1):
+            start_x, start_y = points[i]
+            end_x, end_y = points[i + 1]
+
+            # Generate 'steps' intermediate points between start and end
+            for step in range(1, steps + 1):
+                t = step / steps  # Interpolation factor (0 to 1)
+                x = start_x + t * (end_x - start_x)
+                y = start_y + t * (end_y - start_y)
+                interpolated_points.append((int(x), int(y)))
+
+        print(
+            f"Starting optimized drag through {len(points)} points with "
+            f"{len(interpolated_points)} interpolated points"
+        )
+
+        # Build single shell command with all sendevent operations
+        device = self._multi_touch.device
+        commands = []
+
+        for i, point in enumerate(interpolated_points):
+            device_x, device_y = self._multi_touch._convert_to_device_coords(
+                point[0], point[1]
             )
-            if coords:
-                self.tap(*coords)
-                return True
-            return False
-        finally:
-            os.unlink(screenshot_path)
 
-    def click_text(self, target_text, lang="eng"):
-        """Click on text found on screen"""
-        screenshot_path = self.capture_screen()
-        try:
-            coords = self.find_text_on_screen(screenshot_path, target_text, lang)
-            if coords:
-                self.tap(*coords)
-                return True
-            return False
-        finally:
-            os.unlink(screenshot_path)
+            # Touch events for this point
+            commands.extend(
+                [
+                    f"sendevent {device} {EventCode.EV_ABS.value} {EventCode.ABS_MT_POSITION_X.value} {device_x}",
+                    f"sendevent {device} {EventCode.EV_ABS.value} {EventCode.ABS_MT_POSITION_Y.value} {device_y}",
+                    f"sendevent {device} {EventCode.EV_SYN.value} {EventCode.SYN_MT_REPORT.value} 0",
+                    f"sendevent {device} {EventCode.EV_SYN.value} {EventCode.SYN_REPORT.value} 0",
+                ]
+            )
 
-    def add_pointer(self, x, y):
-        """Add a new touch pointer at the given coordinates"""
-        return self._multi_touch.add_pointer(x, y)
 
-    def move_pointer(self, pointer_id, x, y):
-        """Move an existing pointer to new coordinates"""
-        self._multi_touch.move_pointer(pointer_id, x, y)
+        # Add release events
+        commands.extend(
+            [
+                f"sendevent {device} {EventCode.EV_SYN.value} {EventCode.SYN_MT_REPORT.value} 0",
+                f"sendevent {device} {EventCode.EV_SYN.value} {EventCode.SYN_REPORT.value} 0",
+            ]
+        )
 
-    def remove_pointer(self, pointer_id):
-        """Remove a touch pointer"""
-        self._multi_touch.remove_pointer(pointer_id)
+        # Execute single optimized command
+        full_command = "; ".join(commands)
+        print(f"Executing single ADB command with {len(interpolated_points)} points")
 
-    def get_active_pointers(self):
-        """Get list of active pointer IDs"""
-        return list(self._multi_touch.pointers.keys())
-
-    def clear_all_pointers(self):
-        """Remove all active pointers"""
-        for pointer_id in list(self._multi_touch.pointers.keys()):
-            self._multi_touch.remove_pointer(pointer_id)
+        subprocess.run(
+            ["adb", "-s", self.serial, "shell", full_command],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )

@@ -33,11 +33,13 @@ export interface ScriptDetailResponse {
 
 export interface DeviceDetail {
     id: string
-    device_name: string
-    device_status: string
-    screen_size?: number[]
-    last_seen?: string
-    current_script?: string
+    name: string
+    status: string
+    last_seen: string
+    current_script: string | null
+    current_execution_id: string | null
+    screen_size: [number, number] | null
+    device_name?: string
     script_name?: string
     game_options?: GameOptions
     model?: string

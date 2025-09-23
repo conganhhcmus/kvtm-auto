@@ -175,9 +175,6 @@ npm run format                           # Fix ESLint issues
 npm run build                            # Verify build works
 ```
 
-## Setup Instructions
-
-See `backend/SETUP.md` for detailed pyenv and Poetry setup instructions including:
 - Python 3.9+ installation with pyenv
 - Poetry dependency management
 - ADB and Tesseract OCR setup

@@ -27,4 +27,4 @@ def get_device_logs(device_id):
     device = device_manager.get_device(device_id)
     if not device:
         return jsonify({"error": "Device not found"}), 404
-    return jsonify({"logs": device.get_logs(100)})  # Return last 100 logs
+    return jsonify(device.get_logs(100))  # Return array directly

@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import threading
 from datetime import datetime
@@ -8,13 +9,17 @@ from models.game_options import GameOptions
 
 
 class ExecutionManager:
+    # Class-level shared state for all instances
+    _running_scripts = {}
+
     def __init__(self, device_manager):
-        self.running_scripts = {}
         self.device_manager = device_manager
 
-    def start_script(
-        self, device_id, script_id, script_path, game_options=None
-    ):
+    @property
+    def running_scripts(self):
+        return ExecutionManager._running_scripts
+
+    def start_script(self, device_id, script_id, script_path, game_options=None):
         device = self.device_manager.get_device(device_id)
         if not device:
             raise ValueError("Device not found")
@@ -45,6 +50,7 @@ class ExecutionManager:
                 text=True,
                 bufsize=1,  # Line buffering
                 universal_newlines=True,
+                cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),  # Set working directory to backend/src
             )
 
             device.status = "busy"
@@ -57,6 +63,9 @@ class ExecutionManager:
 
             running_script = RunningScript(device_id, script_id, process)
             self.running_scripts[running_script.id] = running_script
+
+            # Set execution_id on the device for tracking
+            device.current_execution_id = running_script.id
 
             # Start log capture thread
             log_thread = threading.Thread(
@@ -88,6 +97,7 @@ class ExecutionManager:
 
             device.status = "available"
             device.current_script = None
+            device.current_execution_id = None  # Clear execution_id when stopping
 
             # Add completion log
             timestamp = datetime.now().strftime("%H:%M:%S")
@@ -136,12 +146,30 @@ class ExecutionManager:
                         log_entry = f"[{timestamp}]: {line.strip()}"
                         device.add_log(log_entry)
 
+            # Clean up device state when script finishes naturally
+            device.status = "available"
+            device.current_script = None
+            device.current_execution_id = None
+
             timestamp = datetime.now().strftime("%H:%M:%S")
-            completion_log = f"[{timestamp}]: Log capture completed"
+            completion_log = f"[{timestamp}]: Script execution completed"
             device.add_log(completion_log)
+
+            # Remove from running scripts
+            if running_script.id in self.running_scripts:
+                del self.running_scripts[running_script.id]
 
         except Exception as e:
             # Log capture error to device logs
             timestamp = datetime.now().strftime("%H:%M:%S")
             error_log = f"[{timestamp}]: Log capture error: {str(e)}"
             device.add_log(error_log)
+
+            # Clean up device state even on error
+            device.status = "available"
+            device.current_script = None
+            device.current_execution_id = None
+
+            # Remove from running scripts
+            if running_script.id in self.running_scripts:
+                del self.running_scripts[running_script.id]
