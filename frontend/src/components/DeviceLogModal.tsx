@@ -10,18 +10,8 @@ interface DeviceLogModalProps {
     deviceId: string
 }
 
-interface LogEntry {
-    timestamp: string
-    level: string
-    message: string
-    [key: string]: unknown
-}
-
-interface LogResponse {
-    device_id: string
-    logs: LogEntry[]
-    total_lines: number
-}
+// LogResponse is now just an array of strings
+type LogResponse = string[]
 
 const DeviceLogModal: React.FC<DeviceLogModalProps> = ({ isOpen, onClose, deviceId }) => {
     const logContainerRef = useRef<HTMLDivElement>(null)
@@ -35,42 +25,30 @@ const DeviceLogModal: React.FC<DeviceLogModalProps> = ({ isOpen, onClose, device
 
     // Auto-scroll to bottom when new logs are added
     useEffect(() => {
-        if (logContainerRef.current && logData?.logs) {
+        if (logContainerRef.current && logData) {
             logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight
         }
-    }, [logData?.logs])
+    }, [logData])
 
     const handleCopyLogs = () => {
-        if (logData?.logs) {
-            const logText = logData.logs
-                .map(log => `[${log.timestamp}] ${log.level}: ${log.message}`)
-                .join('\n')
+        if (logData) {
+            const logText = logData.join('\n')
             navigator.clipboard.writeText(logText)
         }
     }
 
-    const getLevelColor = (level: string) => {
-        switch (level.toLowerCase()) {
-            case 'error':
-                return 'text-red-600'
-            case 'warning':
-            case 'warn':
-                return 'text-yellow-600'
-            case 'info':
-                return 'text-blue-600'
-            case 'debug':
-                return 'text-gray-600'
-            default:
-                return 'text-gray-800'
+    const getLogColor = (logLine: string) => {
+        const lowerLine = logLine.toLowerCase()
+        if (lowerLine.includes('error') || lowerLine.includes('traceback') || lowerLine.includes('modulenotfounderror')) {
+            return 'text-red-400'
         }
-    }
-
-    const formatTimestamp = (timestamp: string) => {
-        try {
-            return new Date(timestamp).toLocaleTimeString()
-        } catch {
-            return timestamp
+        if (lowerLine.includes('warning') || lowerLine.includes('warn')) {
+            return 'text-yellow-400'
         }
+        if (lowerLine.includes('started') || lowerLine.includes('completed')) {
+            return 'text-green-400'
+        }
+        return 'text-gray-300'
     }
 
     return (
@@ -81,7 +59,7 @@ const DeviceLogModal: React.FC<DeviceLogModalProps> = ({ isOpen, onClose, device
                     <div className="flex items-center space-x-2">
                         <ScrollText className="w-5 h-5 text-gray-600" />
                         <span className="text-sm text-gray-600">
-                            {logData ? `${logData.total_lines} log entries` : 'Loading logs...'}
+                            {logData ? `${logData.length} log entries` : 'Loading logs...'}
                         </span>
                     </div>
                     <div className="flex space-x-2">
@@ -95,7 +73,7 @@ const DeviceLogModal: React.FC<DeviceLogModalProps> = ({ isOpen, onClose, device
                         </button>
                         <button
                             onClick={handleCopyLogs}
-                            disabled={!logData?.logs?.length}
+                            disabled={!logData?.length}
                             className="inline-flex items-center px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 disabled:opacity-50 transition-colors"
                         >
                             <Copy className="w-4 h-4 mr-1" />
@@ -119,25 +97,15 @@ const DeviceLogModal: React.FC<DeviceLogModalProps> = ({ isOpen, onClose, device
                         <div className="flex items-center justify-center h-full text-red-400">
                             <span>Error loading logs. Please try refreshing.</span>
                         </div>
-                    ) : !logData?.logs?.length ? (
+                    ) : !logData?.length ? (
                         <div className="flex items-center justify-center h-full text-gray-500">
                             <span>No logs available for this device.</span>
                         </div>
                     ) : (
                         <div className="space-y-1">
-                            {logData.logs.map((log, index) => (
-                                <div key={index} className="leading-relaxed">
-                                    <span className="text-gray-400">
-                                        [{formatTimestamp(log.timestamp)}]
-                                    </span>
-                                    {' '}
-                                    <span className={`font-semibold ${getLevelColor(log.level)}`}>
-                                        {log.level.toUpperCase()}:
-                                    </span>
-                                    {' '}
-                                    <span className="text-green-300">
-                                        {log.message}
-                                    </span>
+                            {logData.map((logLine, index) => (
+                                <div key={index} className={`leading-relaxed ${getLogColor(logLine)}`}>
+                                    {logLine}
                                 </div>
                             ))}
                         </div>

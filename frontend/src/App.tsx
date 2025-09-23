@@ -9,12 +9,12 @@ import MultiSelect from '@/components/MultiSelect'
 
 interface Device {
     id: string
-    device_name: string
-    device_status: string
-    screen_size?: [number, number]
-    last_seen?: string
-    current_script?: string
-    execution_id?: string
+    name: string
+    status: string
+    last_seen: string
+    current_script: string | null
+    current_execution_id: string | null
+    screen_size: [number, number] | null
 }
 
 // Using ScriptResponse interface from api.ts
@@ -34,7 +34,6 @@ function App() {
     const [selectedDeviceForLogs, setSelectedDeviceForLogs] = useState('')
     const [isControlPanelExpanded, setIsControlPanelExpanded] = useState(true)
     const [stoppingDevices, setStoppingDevices] = useState<Set<string>>(new Set())
-    const [executionMap, setExecutionMap] = useState<Map<string, string>>(new Map()) // device_id -> execution_id
 
     const { data: devices = [] } = useQuery({
         queryKey: ['devices'],
@@ -61,22 +60,16 @@ function App() {
 
             // Execute scripts on each device sequentially
             const results = []
-            const newExecutionMap = new Map(executionMap)
 
             for (const deviceId of selectedDevices) {
                 try {
                     const response = await executeApi.runScript(selectedScript, deviceId, gameOptions)
                     results.push({ deviceId, success: true, data: response.data })
-                    // Store execution_id for this device
-                    if (response.data.execution_id) {
-                        newExecutionMap.set(deviceId, response.data.execution_id)
-                    }
                 } catch (error) {
                     results.push({ deviceId, success: false, error })
                 }
             }
 
-            setExecutionMap(newExecutionMap)
             return results
         },
         onSuccess: (results) => {
@@ -148,11 +141,12 @@ function App() {
 
     // Convert devices and scripts to options format
     const deviceOptions = devices.map((device: Device) => {
-        const isRunning = device.current_script && device.device_status === 'running'
+        const isRunning = device.current_script && device.status === 'busy'
+        const screenSizeText = device.screen_size ? ` | ${device.screen_size[0]}x${device.screen_size[1]}` : ''
         return {
             value: device.id,
-            label: device.device_name || device.id,
-            description: `Status: ${device.device_status}${device.screen_size ? ` | Size: ${device.screen_size[0]}x${device.screen_size[1]}` : ''}${isRunning ? ' (Running - Cannot select)' : ''}`,
+            label: device.name,
+            description: `Status: ${device.status}${screenSizeText}${isRunning ? ' (Running - Cannot select)' : ''}`,
             disabled: isRunning
         }
     })
@@ -173,9 +167,9 @@ function App() {
     }
 
     const handleStopDevice = (deviceId: string) => {
-        // Get execution_id for this device
-        const executionId = executionMap.get(deviceId)
-        if (!executionId) {
+        // Find the device and get its execution_id
+        const device = devices.find((d: Device) => d.id === deviceId)
+        if (!device || !device.current_execution_id) {
             console.error(`No execution_id found for device ${deviceId}`)
             return
         }
@@ -183,24 +177,19 @@ function App() {
         // Add device to stopping set for UI feedback
         setStoppingDevices(prev => new Set([...prev, deviceId]))
 
-        stopDeviceMutation.mutate(executionId, {
+        stopDeviceMutation.mutate(device.current_execution_id, {
             onSettled: () => {
-                // Remove device from stopping set and execution map when operation completes
+                // Remove device from stopping set when operation completes
                 setStoppingDevices(prev => {
                     const newSet = new Set(prev)
                     newSet.delete(deviceId)
                     return newSet
                 })
-                setExecutionMap(prev => {
-                    const newMap = new Map(prev)
-                    newMap.delete(deviceId)
-                    return newMap
-                })
             }
         })
     }
 
-    const runningDevices = devices.filter((device: Device) => device.current_script && device.device_status === 'running')
+    const runningDevices = devices.filter((device: Device) => device.current_script && device.status === 'busy')
 
     const handleViewDevice = (deviceId: string) => {
         setSelectedDeviceDetail(deviceId)
@@ -212,7 +201,7 @@ function App() {
         setShowLogModal(true)
     }
 
-    const getScriptDisplayName = (scriptId: string | undefined): string => {
+    const getScriptDisplayName = (scriptId: string | null | undefined): string => {
         if (!scriptId) return 'No script';
         const script = scripts.find((s: ScriptResponse) => s.id === scriptId);
         return script ? script.name : scriptId; // Fallback to ID if name not found
@@ -367,13 +356,16 @@ function App() {
                                 <div key={device.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:shadow-md transition-shadow">
                                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                                         <div className="flex-1">
-                                            <h3 className="font-semibold text-gray-900 text-lg">{device.device_name || device.id}</h3>
+                                            <h3 className="font-semibold text-gray-900 text-lg">{device.name}</h3>
                                             <p className="text-sm text-gray-600 mt-1">
                                                 Script: <span className="font-medium">{getScriptDisplayName(device.current_script)}</span>
                                             </p>
-                                            {device.last_seen && (
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                Last seen: {new Date(device.last_seen).toLocaleString()}
+                                            </p>
+                                            {device.screen_size && (
                                                 <p className="text-xs text-gray-500 mt-1">
-                                                    Last seen: {new Date(device.last_seen).toLocaleString()}
+                                                    Screen: {device.screen_size[0]}x{device.screen_size[1]}
                                                 </p>
                                             )}
                                             <div className="flex items-center mt-2">

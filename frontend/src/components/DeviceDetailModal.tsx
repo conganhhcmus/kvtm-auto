@@ -34,14 +34,14 @@ const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, onClose, 
                         <div className="flex items-center space-x-4">
                             <Smartphone className="w-12 h-12 text-gray-600" />
                             <div>
-                                <h3 className="text-xl font-bold text-gray-900">{device.device_name || device.id}</h3>
+                                <h3 className="text-xl font-bold text-gray-900">{device.name}</h3>
                                 <p className="text-gray-600">{device.model || `Device ${device.id}`}</p>
                                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                    device.device_status === 'running' ? 'text-green-600 bg-green-100' :
-                                    device.device_status === 'available' ? 'text-blue-600 bg-blue-100' :
+                                    device.status === 'busy' ? 'text-green-600 bg-green-100' :
+                                    device.status === 'available' ? 'text-blue-600 bg-blue-100' :
                                     'text-gray-600 bg-gray-100'
                                 }`}>
-                                    {device.device_status}
+                                    {device.status}
                                 </span>
                             </div>
                         </div>
@@ -60,11 +60,11 @@ const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, onClose, 
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-gray-600">Device Name:</span>
-                                        <span className="font-medium">{device.device_name}</span>
+                                        <span className="font-medium">{device.name}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-gray-600">Status:</span>
-                                        <span className="font-medium capitalize">{device.device_status}</span>
+                                        <span className="font-medium capitalize">{device.status}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-gray-600">Screen Size:</span>
@@ -99,9 +99,9 @@ const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, onClose, 
                                     <div className="flex justify-between">
                                         <span className="text-gray-600">Execution Status:</span>
                                         <span className={`font-medium ${
-                                            device.device_status === 'running' ? 'text-green-600' : 'text-gray-500'
+                                            device.status === 'busy' ? 'text-green-600' : 'text-gray-500'
                                         }`}>
-                                            {device.device_status === 'running' ? 'Active' : 'Not Running'}
+                                            {device.status === 'busy' ? 'Active' : 'Not Running'}
                                         </span>
                                     </div>
                                 </div>
@@ -173,25 +173,25 @@ const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, onClose, 
                         {/* Current Script Status */}
                         {device.current_script && (
                             <div className={`rounded-lg p-4 ${
-                                device.device_status === 'running' ? 'bg-green-50 border border-green-200' : 'bg-yellow-50 border border-yellow-200'
+                                device.status === 'busy' ? 'bg-green-50 border border-green-200' : 'bg-yellow-50 border border-yellow-200'
                             }`}>
                                 <h4 className={`font-semibold mb-2 ${
-                                    device.device_status === 'running' ? 'text-green-900' : 'text-yellow-900'
+                                    device.status === 'busy' ? 'text-green-900' : 'text-yellow-900'
                                 }`}>
                                     Current Script Execution
                                 </h4>
                                 <div className="space-y-1 text-sm">
                                     <p className={`font-medium ${
-                                        device.device_status === 'running' ? 'text-green-800' : 'text-yellow-800'
+                                        device.status === 'busy' ? 'text-green-800' : 'text-yellow-800'
                                     }`}>
                                         Running: {device.script_name || device.current_script}
                                     </p>
                                     <p className={`text-xs ${
-                                        device.device_status === 'running' ? 'text-green-600' : 'text-yellow-600'
+                                        device.status === 'busy' ? 'text-green-600' : 'text-yellow-600'
                                     }`}>
                                         Script ID: {device.current_script}
                                     </p>
-                                    {device.device_status === 'running' && (
+                                    {device.status === 'busy' && (
                                         <div className="flex items-center mt-2">
                                             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse mr-2"></div>
                                             <span className="text-green-700 text-xs font-medium">Active</span>

@@ -6,6 +6,26 @@ from datetime import datetime
 from models.device import Device
 
 
+def get_device_screen_size(serial):
+    """Get device screen size as [width, height]"""
+    try:
+        result = subprocess.run(
+            ["adb", "-s", serial, "shell", "wm", "size"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        # Parse output like "Physical size: 1920x1080"
+        for line in result.stdout.splitlines():
+            if "Physical size:" in line:
+                size_str = line.split("Physical size:")[-1].strip()
+                width, height = map(int, size_str.split("x"))
+                return [width, height]
+        return None
+    except Exception:
+        return None
+
+
 class DeviceManager:
     _instance = None
     _initialized = False
@@ -38,11 +58,20 @@ class DeviceManager:
                             current_serials.add(serial)
 
                             if serial not in self.devices:
-                                self.devices[serial] = Device(serial)
+                                device = Device(serial)
+                                # Fetch screen size if not already cached
+                                if device.screen_size is None:
+                                    device.screen_size = get_device_screen_size(serial)
+                                self.devices[serial] = device
                             else:
                                 self.devices[serial].last_seen = datetime.now()
                                 if self.devices[serial].status == "offline":
                                     self.devices[serial].status = "available"
+                                # Fetch screen size if not already cached
+                                if self.devices[serial].screen_size is None:
+                                    self.devices[
+                                        serial
+                                    ].screen_size = get_device_screen_size(serial)
 
                     # Mark devices as offline if not found
                     for serial in list(self.devices.keys()):

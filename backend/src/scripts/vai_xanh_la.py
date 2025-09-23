@@ -2,9 +2,12 @@ import json
 import os
 import sys
 
-from src.libs.adb_controller import AdbController
-from src.models.game_options import GameOptions
-from src.scripts.core import open_chest, open_game, sell_items
+# Add the backend/src directory to the Python path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from libs.adb_controller import AdbController
+from models.game_options import GameOptions
+from scripts.core import open_chest, open_game, sell_items
 
 
 def main():
@@ -26,27 +29,16 @@ def main():
 
     manager = AdbController(device_id)
 
-    options_str = game_options.to_dict()
-    print(f"[{device_id}] Starting vai xanh la automation with options:")
-    print(f"[{device_id}] {options_str}")
+    # if game_options.open_game:
+    #     open_game(manager)
 
-    if game_options.open_game:
-        open_game(manager)
-
-    if game_options.open_chest:
-        open_chest(manager)
+    # if game_options.open_chest:
+    #     open_chest(manager)
 
     if game_options.sell_items:
         sell_items(manager)
 
-    # Example: Click on text
-    manager.click_text("Submit")
-
-    # Example: Click on image (template in assets)
-    template_path = os.path.join("src", "assets", "button_template.png")
-    manager.click_image(template_path)
-
-    print(f"[{device_id}] Vai xanh la automation completed")
+    print("Vai xanh la automation completed")
 
 
 if __name__ == "__main__":
