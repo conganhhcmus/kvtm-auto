@@ -93,7 +93,7 @@ api.interceptors.response.use(
 
 // Device API
 export const deviceApi = {
-    getDevices: () => api.get('/devices/'),
+    getDevices: () => api.get('/devices'),
     getDevice: (deviceId: string) => api.get(`/devices/${deviceId}`),
     getDeviceLogs: (deviceId: string, limit?: number) => api.get(`/devices/${deviceId}/logs`, { params: { limit } }),
     connectDevice: (deviceId: string) => api.post(`/devices/${deviceId}/connect`),
@@ -103,15 +103,15 @@ export const deviceApi = {
 
 // Script API
 export const scriptApi = {
-    getScripts: () => api.get('/scripts/'),
+    getScripts: () => api.get('/scripts'),
     getScript: (scriptId: string) => api.get(`/scripts/${scriptId}`),
-    runScript: (scriptId: string, deviceIds: string[], gameOptions?: GameOptions) => 
-        api.post('/execute/start', { 
-            device_ids: deviceIds,
+    runScript: (scriptId: string, deviceId: string, gameOptions?: GameOptions) =>
+        api.post('/execute/start', {
+            device_id: deviceId,
             script_id: scriptId,
             game_options: gameOptions || {}
         }),
-    stopDevice: (deviceId: string) => api.post('/execute/stop', { device_id: deviceId }),
+    stopScript: (executionId: string) => api.post('/execute/stop', { execution_id: executionId }),
     stopAllDevices: () => api.post('/execute/stop-all'),
 }
 

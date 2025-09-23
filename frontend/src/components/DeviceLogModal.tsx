@@ -14,7 +14,7 @@ interface LogEntry {
     timestamp: string
     level: string
     message: string
-    [key: string]: any
+    [key: string]: unknown
 }
 
 interface LogResponse {

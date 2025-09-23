@@ -14,6 +14,7 @@ interface Device {
     screen_size?: [number, number]
     last_seen?: string
     current_script?: string
+    execution_id?: string
 }
 
 // Using ScriptResponse interface from api.ts
@@ -33,6 +34,7 @@ function App() {
     const [selectedDeviceForLogs, setSelectedDeviceForLogs] = useState('')
     const [isControlPanelExpanded, setIsControlPanelExpanded] = useState(true)
     const [stoppingDevices, setStoppingDevices] = useState<Set<string>>(new Set())
+    const [executionMap, setExecutionMap] = useState<Map<string, string>>(new Map()) // device_id -> execution_id
 
     const { data: devices = [] } = useQuery({
         queryKey: ['devices'],
@@ -47,36 +49,60 @@ function App() {
     })
 
     const runMutation = useMutation({
-        mutationFn: () => {
+        mutationFn: async () => {
             if (selectedDevices.length === 0) throw new Error('No devices selected')
             if (!selectedScript) throw new Error('No script selected')
-            
+
             const gameOptions: GameOptions = {
                 open_game: openGame,
                 open_chest: openChests,
                 sell_items: sellItems
             }
-            
-            return scriptApi.runScript(selectedScript, selectedDevices, gameOptions)
+
+            // Execute scripts on each device sequentially
+            const results = []
+            const newExecutionMap = new Map(executionMap)
+
+            for (const deviceId of selectedDevices) {
+                try {
+                    const response = await scriptApi.runScript(selectedScript, deviceId, gameOptions)
+                    results.push({ deviceId, success: true, data: response.data })
+                    // Store execution_id for this device
+                    if (response.data.execution_id) {
+                        newExecutionMap.set(deviceId, response.data.execution_id)
+                    }
+                } catch (error) {
+                    results.push({ deviceId, success: false, error })
+                }
+            }
+
+            setExecutionMap(newExecutionMap)
+            return results
         },
-        onSuccess: () => {
+        onSuccess: (results) => {
             // Store counts before clearing for success message
             const deviceCount = selectedDevices.length
-            
+            const successCount = results.filter(r => r.success).length
+
             // Clear form selections after successful run
             setSelectedDevices([])
             setSelectedScript('')
-            
+
             // Invalidate and refetch devices data immediately for faster UI update
             queryClient.invalidateQueries({ queryKey: ['devices'] })
-            
-            // Optional: Show success feedback (you could add a toast notification here)
-            console.log(`Successfully started script on ${deviceCount} device(s)`)
+
+            // Show success feedback
+            console.log(`Successfully started script on ${successCount}/${deviceCount} device(s)`)
+
+            // Log any failures
+            const failures = results.filter(r => !r.success)
+            if (failures.length > 0) {
+                console.error('Failed devices:', failures)
+            }
         },
         onError: (error) => {
             // Handle errors gracefully
             console.error('Failed to start script:', error)
-            // You could add error toast notifications here
         },
     })
 
@@ -92,7 +118,7 @@ function App() {
             console.log(`Stop All completed: ${result.message}`)
             
             if (result.failed_devices.length > 0) {
-                console.warn('Some devices failed to stop:', result.device_details.filter((d: any) => d.status === 'failed'))
+                console.warn('Some devices failed to stop:', result.device_details.filter((d: { status: string }) => d.status === 'failed'))
             }
             
             // Show success feedback
@@ -106,15 +132,15 @@ function App() {
     })
 
     const stopDeviceMutation = useMutation({
-        mutationFn: (deviceId: string) => scriptApi.stopDevice(deviceId),
-        onSuccess: (_, deviceId) => {
+        mutationFn: (executionId: string) => scriptApi.stopScript(executionId),
+        onSuccess: (_, executionId) => {
             // Immediately invalidate and refetch for faster UI update
             queryClient.invalidateQueries({ queryKey: ['devices'] })
             queryClient.refetchQueries({ queryKey: ['devices'] })
-            console.log(`Successfully stopped device ${deviceId}`)
+            console.log(`Successfully stopped execution ${executionId}`)
         },
-        onError: (error, deviceId) => {
-            console.error(`Failed to stop device ${deviceId}:`, error)
+        onError: (error, executionId) => {
+            console.error(`Failed to stop execution ${executionId}:`, error)
             // Still try to refresh in case of partial success
             queryClient.invalidateQueries({ queryKey: ['devices'] })
         },
@@ -147,16 +173,28 @@ function App() {
     }
 
     const handleStopDevice = (deviceId: string) => {
+        // Get execution_id for this device
+        const executionId = executionMap.get(deviceId)
+        if (!executionId) {
+            console.error(`No execution_id found for device ${deviceId}`)
+            return
+        }
+
         // Add device to stopping set for UI feedback
         setStoppingDevices(prev => new Set([...prev, deviceId]))
-        
-        stopDeviceMutation.mutate(deviceId, {
+
+        stopDeviceMutation.mutate(executionId, {
             onSettled: () => {
-                // Remove device from stopping set when operation completes
+                // Remove device from stopping set and execution map when operation completes
                 setStoppingDevices(prev => {
                     const newSet = new Set(prev)
                     newSet.delete(deviceId)
                     return newSet
+                })
+                setExecutionMap(prev => {
+                    const newMap = new Map(prev)
+                    newMap.delete(deviceId)
+                    return newMap
                 })
             }
         })

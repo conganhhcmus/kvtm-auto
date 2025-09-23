@@ -6,11 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Local Development
 
-#### Backend (Python FastAPI)
+#### Backend (Python Flask)
 ```bash
 cd backend
 poetry install                           # Install dependencies
-poetry run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000  # Start development server
+cd src && poetry run python main.py      # Start development server (port 3001)
 poetry run black src/                    # Format code
 poetry run isort src/                    # Sort imports
 poetry run flake8 src/                   # Lint code
@@ -41,30 +41,20 @@ docker-compose build          # Rebuild containers after code changes
 ## Architecture Overview (Post-Refactoring)
 
 ### Backend Structure (`backend/src/`)
-- **main.py**: FastAPI application entry point with CORS and global exception handling
-- **api/**: REST API endpoints - **SIMPLIFIED**
-  - **devices.py**: Device management with unified API models
-  - **scripts.py**: Script discovery without complex validation
-  - **execute.py**: Script execution with simplified error handling
-- **service/**: Service layer - **STREAMLINED**
-  - **executor.py**: **Subprocess-only** execution system (no threading complexity)
-  - **database.py**: JSON database with **simplified logging format**
-  - **script.py**: Script management utilities
-- **libs/**: Core utility libraries - **ENHANCED**
-  - **adb.py**: Android Debug Bridge wrapper
-  - **image.py**: Image processing utilities
-  - **shell.py**: **NEW - Shell command utilities with loop support**
-  - **time_provider.py**: **Enhanced time utilities (UTC + GMT+7)**
-  - **log_actions.py**: **NEW - Standard log action constants**
-- **models/**: Data models - **UNIFIED**
-  - **device.py**: Device and DeviceStatus models
-  - **script.py**: Script metadata and GameOptions models
-  - **api.py**: **NEW - All API request/response models in one place**
+- **main.py**: Flask application entry point with CORS and Blueprint registration
+- **apis/**: REST API endpoints using Flask Blueprints
+  - **device_apis.py**: Device management endpoints (`/api/devices`)
+  - **script_apis.py**: Script discovery and listing (`/api/scripts`)
+  - **execution_apis.py**: Script execution management (`/api/execute`)
+  - **system_apis.py**: Health check and system status (`/health`)
+- **libs/**: Core utility libraries
+  - **device_manager.py**: Android device discovery and management via ADB
+  - **script_manager.py**: Script file discovery and metadata
+  - **execution_manager.py**: Subprocess-based script execution
+  - **adb_controller.py**: ADB wrapper with image/text detection (OpenCV + Tesseract)
 - **scripts/**: Automation scripts directory
-  - **_core.py**: **Enhanced with simple log format [Time]: [Action] [Index]**
-  - **example_script.py**, **open_game.py**: Sample automation scripts
-- **data/**: JSON data storage (**moved under src/**)
-- **logs/**: Application log files (**moved under src/**)
+  - **tap_example.py**: Example script demonstrating ADB interactions
+  - Scripts use direct ADB commands for device control
 
 ### Frontend Structure (`frontend/src/`)
 - **App.tsx**: Main application component
@@ -77,29 +67,28 @@ docker-compose build          # Rebuild containers after code changes
   - **SearchableSelect.tsx**: Searchable dropdown
 - Built with Vite 7.1.2 + React 18.2 + TypeScript 5+ + Tailwind CSS 3.3
 
-### Script System - **SIMPLIFIED**
-Scripts use the new simple logging format:
+### Script System - **CURRENT IMPLEMENTATION**
+Scripts are Python files that receive device_id as command line argument:
 ```python
-from scripts._core import write_log, log_run_open_game, log_run_script
+import sys
+import os
+from src.libs.adb_controller import MultiDeviceManager
 
-SCRIPT_META = {
-    "id": "script_id",
-    "name": "Display Name", 
-    "order": 1,
-    "marked": True,
-    "description": "What this script does"
-}
+def main():
+    device_id = sys.argv[1]  # Device serial from command line
+    manager = MultiDeviceManager()
 
-def main(device: Device, game_options: GameOptions, context):
-    # New simple logging - displays as [12:34:56 PM]: Run Open Game
-    log_run_open_game(device.id)
-    log_run_script(device.id, 1000)  # [12:34:57 PM]: Run Script [1000] times
+    # Direct ADB interactions
+    manager.tap(device_id, 500, 1000)  # Tap at coordinates
+    manager.click_text(device_id, "Submit")  # Click on text using OCR
+
+    # Image template matching
+    template_path = os.path.join("src", "assets", "button_template.png")
+    manager.click_image(device_id, template_path)
+
+if __name__ == "__main__":
+    main()
     
-    # Custom actions
-    write_log(device.id, "Taking screenshot")
-    write_log(device.id, "Waiting", "5.0s")  # [12:34:58 PM]: Waiting [5.0s]
-    
-    return {"success": True, "message": "Completed"}
 ```
 
 ### Device Management
@@ -108,14 +97,13 @@ def main(device: Device, game_options: GameOptions, context):
 - **Simple log format**: `[Time]: [Action] [Index]`
 - Real-time device status tracking
 
-### Key Integrations - **UPDATED**
-- **ADB**: Direct subprocess calls to Android Debug Bridge
-- **OpenCV/NumPy**: Image processing (v4.8.1, v1.24.4)
-- **FastAPI**: Async web framework v0.104.1 with automatic OpenAPI docs at `/docs`
-- **Shell Utilities**: **NEW - Enhanced shell command building with loop support**
-- **Simple Logging**: **NEW - User-friendly log format [Time]: [Action] [Index]**
-- **Unified Models**: **NEW - All API models centralized in models/api.py**
-- **Global Exception Handling**: **Simplified error handling**
+### Key Integrations - **CURRENT**
+- **ADB**: Direct subprocess calls to Android Debug Bridge for device control
+- **OpenCV**: Image template matching and computer vision (v4.8.1+)
+- **Tesseract**: OCR text recognition for UI automation
+- **Flask**: Web framework with Blueprint architecture and CORS support
+- **NumPy/Pillow**: Image processing and manipulation
+- **Threading**: Background device discovery via ADB polling
 
 ## Development Workflow
 
@@ -129,44 +117,37 @@ def main(device: Device, game_options: GameOptions, context):
 ## Important Notes - **UPDATED**
 
 ### **Deployment Options**
-- **Local Development**: Backend (8000) + Frontend (5173) separate processes
-- **Docker**: Backend (8000) + Frontend (3000) containerized
+- **Local Development**: Backend (3001) + Frontend (5173) separate processes
+- **Docker**: Backend (3001) + Frontend (3000) containerized
 
-### **Recent Refactoring Benefits**
-- **50% less code** - Simplified executor and API endpoints
-- **Subprocess-only execution** - No threading complexity
-- **Unified API models** - Single source of truth
-- **Simple log format** - User-friendly `[Time]: [Action] [Index]`
-- **Enhanced shell support** - Programmatic command building
-- **Global error handling** - Consistent across all endpoints
+### **Current Architecture Benefits**
+- **Flask Blueprint structure** - Modular API organization
+- **Subprocess execution** - Isolated script execution
+- **ADB integration** - Direct Android device control
+- **Computer vision** - OpenCV + Tesseract for UI automation
+- **Background discovery** - Automatic device detection
 
 ### **Architecture**
-- Backend starts on port 8000 with health check at `/health`
+- Backend (Flask): port 3001 with health check at `/health`
 - Frontend: localhost:5173 (local dev) or localhost:3000 (Docker)
-- API endpoints prefixed with `/api/`
-- **Data/logs moved under `src/`** for better organization
-- **Shell class** provides clean command building interface
-- **Time provider** supports both UTC and GMT+7 operations
+- API endpoints: `/api/devices`, `/api/scripts`, `/api/execute`
+- Scripts executed as subprocesses with device_id parameter
+- ADB integration for Android device automation
+- Image/text recognition for UI automation
 
-### **Logging System** - **NEW**
-```python
-# Old format: 2024-01-01 12:12:39.123 | INFO | device_123: Starting script
-# New format: [12:12:39 PM]: Run Script [1000] times
-
-# Usage in scripts:
-write_log(device_id, "Script started", script_name)
-log_run_open_game(device_id)
-log_run_script(device_id, 1000)
-log_loop_iteration(device_id, 1, 1000)  # [12:13:01 PM]: Loop [1/1000]
-```
+### **Script Development Guidelines**
+- Scripts receive `device_id` as command line argument
+- Use `MultiDeviceManager` for all ADB interactions
+- Image templates stored in `src/assets/` for matching
+- OCR text detection with Tesseract integration
+- Process isolation ensures stability
 
 ### **Development**
-- Use `poetry run uvicorn src.main:app --reload` for backend development
-- Use `npm run dev` for frontend development  
-- Use `docker-compose up` for full-stack testing
-- All logs display in clean `[Time]: [Action] [Index]` format
-- Shell commands built with `Shell.build_script_execution_command()`
-- Keep `__init__.py` file is empty
+- Backend: `cd backend/src && poetry run python main.py` (port 3001)
+- Frontend: `npm run dev` (port 5173)
+- Docker: `docker-compose up` for full-stack testing
+- Scripts executed via subprocess with device serial parameter
+- Device logs stored in Device objects for UI display
 
 ## Testing & Quality Assurance
 
@@ -194,20 +175,11 @@ npm run format                           # Fix ESLint issues
 npm run build                            # Verify build works
 ```
 
-## Key Refactoring Changes Summary
+## Setup Instructions
 
-### **What Changed**
-1. **Executor**: From 450 lines → 150 lines (subprocess-only)
-2. **Execute API**: From 350 lines → 140 lines (simplified)
-3. **Scripts API**: From 100 lines → 40 lines (no validation)
-4. **Logging**: Complex format → Simple `[Time]: [Action] [Index]`
-5. **Models**: Scattered → Unified in `models/api.py`
-6. **Shell**: Functions → `Shell` class with enhanced capabilities
-7. **Error Handling**: Try-catch everywhere → Global exception handler
-
-### **Benefits**
-- **Maintainability**: 50% less code, cleaner architecture
-- **Reliability**: Subprocess isolation, consistent error handling  
-- **User Experience**: Clean, readable logs
-- **Developer Experience**: Unified models, simplified APIs
-- **Performance**: Removed unnecessary complexity and overhead
+See `backend/SETUP.md` for detailed pyenv and Poetry setup instructions including:
+- Python 3.9+ installation with pyenv
+- Poetry dependency management
+- ADB and Tesseract OCR setup
+- Development workflow commands
+- The frontend and backend is running in dev now. No need to run again

@@ -1,27 +1,27 @@
 [tool.poetry]
 name = "kvtm-auto-backend"
 version = "0.1.0"
-description = "Android device automation backend with FastAPI"
+description = "KVTM Auto - Android Device Automation Backend"
 authors = ["Your Name <your.email@example.com>"]
-readme = "README.md"
+packages = [{include = "src"}]
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.9"
-fastapi = "^0.104.1"
-uvicorn = {extras = ["standard"], version = "^0.24.0"}
-pydantic = "^2.5.0"
-loguru = "^0.7.2"
+flask = "^3.0.0"
+flask-cors = "^4.0.0"
 opencv-python = "^4.8.1"
+pillow = "^10.0.0"
 numpy = "^1.24.4"
+pytesseract = "^0.3.10"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^7.4.3"
-pytest-asyncio = "^0.21.1"
-black = "^23.11.0"
+black = "^23.0.0"
 isort = "^5.12.0"
-flake8 = "^6.1.0"
-mypy = "^1.7.1"
-pre-commit = "^3.6.0"
+flake8 = "^6.0.0"
+mypy = "^1.5.0"
+pytest = "^7.4.0"
+pytest-cov = "^4.1.0"
 
 [build-system]
 requires = ["poetry-core"]
@@ -31,29 +31,36 @@ build-backend = "poetry.core.masonry.api"
 line-length = 88
 target-version = ['py39']
 include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
 
 [tool.isort]
 profile = "black"
 multi_line_output = 3
 line_length = 88
+known_first_party = ["src"]
 
 [tool.mypy]
 python_version = "3.9"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
-
-[tool.flake8]
-max-line-length = 88
-extend-ignore = ["E203", "W503"]
-max-complexity = 10
-per-file-ignores = [
-    "__init__.py:F401"
-]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-python_files = ["test_*.py"]
+python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-asyncio_mode = "auto"
+addopts = "--cov=src --cov-report=term-missing --cov-report=html"
