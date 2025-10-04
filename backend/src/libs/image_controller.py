@@ -23,7 +23,7 @@ class ImageController:
         Read image from assets folder and return raw bytes
 
         Args:
-            asset_filename: Filename in the assets folder (e.g., 'test.png')
+            asset_filename: Filename in the assets folder (e.g., 'test')
 
         Returns:
             Image bytes
@@ -34,7 +34,7 @@ class ImageController:
         # Build path to assets folder relative to this file
         # backend/src/libs/image_controller.py -> backend/src/assets/
         current_file = Path(__file__)
-        assets_path = current_file.parent.parent / "assets" / asset_filename
+        assets_path = current_file.parent.parent / "assets" / f"{asset_filename}.png"
         assets_path = assets_path.resolve()
 
         if not assets_path.exists():
@@ -62,7 +62,7 @@ class ImageController:
     def _multi_scale_match(
         screen: np.ndarray, template: np.ndarray, threshold: float
     ) -> Optional[Tuple[int, int]]:
-        """Perform multi-scale template matching with rotation support and early termination"""
+        """Perform template matching with rotation support and early termination"""
         template_h, template_w = template.shape
         screen_h, screen_w = screen.shape
 
@@ -75,8 +75,7 @@ class ImageController:
         best_match = None
         best_confidence = 0
 
-        # Try different scales and rotations
-        scales = [1.0, 0.8, 1.2, 0.6, 1.5, 0.5, 2.0, 0.7, 0.9, 1.1, 1.3, 1.4, 1.6, 1.8]
+        # Try different rotations (no scaling for performance)
         rotations = [0, 90, 180, 270]  # Common device rotations
 
         for rotation in rotations:
@@ -92,47 +91,33 @@ class ImageController:
 
             rot_h, rot_w = rotated_template.shape
 
-            for scale in scales:
-                # Calculate new dimensions
-                new_w = int(rot_w * scale)
-                new_h = int(rot_h * scale)
+            # Skip if rotated template is larger than screen
+            if rot_h > screen_h or rot_w > screen_w:
+                continue
 
-                # Skip if scaled template is too large
-                if new_h > screen_h or new_w > screen_w:
-                    continue
+            # Perform template matching
+            result = cv2.matchTemplate(screen, rotated_template, cv2.TM_CCOEFF_NORMED)
+            _, max_val, _, max_loc = cv2.minMaxLoc(result)
 
-                # Skip if scaled template is too small (less than 10x10)
-                if new_h < 10 or new_w < 10:
-                    continue
+            # Early termination if we found a good match
+            if max_val >= threshold:
+                center_x = max_loc[0] + rot_w // 2
+                center_y = max_loc[1] + rot_h // 2
+                return (center_x, center_y)
 
-                # Resize rotated template
-                scaled_template = cv2.resize(rotated_template, (new_w, new_h))
-
-                # Perform template matching
-                result = cv2.matchTemplate(
-                    screen, scaled_template, cv2.TM_CCOEFF_NORMED
-                )
-                _, max_val, _, max_loc = cv2.minMaxLoc(result)
-
-                # Early termination if we found a good match
-                if max_val >= threshold:
-                    center_x = max_loc[0] + new_w // 2
-                    center_y = max_loc[1] + new_h // 2
-                    return (center_x, center_y)
-
-                # Keep track of best match even if below threshold
-                if max_val > best_confidence:
-                    best_confidence = max_val
-                    center_x = max_loc[0] + new_w // 2
-                    center_y = max_loc[1] + new_h // 2
-                    best_match = (center_x, center_y)
+            # Keep track of best match even if below threshold
+            if max_val > best_confidence:
+                best_confidence = max_val
+                center_x = max_loc[0] + rot_w // 2
+                center_y = max_loc[1] + rot_h // 2
+                best_match = (center_x, center_y)
 
         # Return best match only if above threshold
         return best_match if best_confidence >= threshold else None
 
     @staticmethod
     def get_coordinate(
-        screen_bytes: bytes, template_bytes: bytes, threshold: float = 0.8
+        screen_bytes: bytes, template_bytes: bytes, threshold: float = 0.9
     ) -> Optional[Tuple[int, int]]:
         """
         Find template image within screen capture with similarity threshold
@@ -140,7 +125,7 @@ class ImageController:
         Args:
             screen_bytes: Screen capture bytes from adb.capture_screen()
             template_bytes: Template image bytes from file
-            threshold: Similarity threshold (default 0.8 for 80% similarity)
+            threshold: Similarity threshold (default 0.9 for 90% similarity)
 
         Returns:
             Tuple of (x, y) center coordinates if match found, None otherwise
@@ -155,7 +140,9 @@ class ImageController:
             template_gray = ImageController._preprocess_image(template_img)
 
             # Perform multi-scale template matching
-            return ImageController._multi_scale_match(screen_gray, template_gray, threshold)
+            return ImageController._multi_scale_match(
+                screen_gray, template_gray, threshold
+            )
 
         except Exception as e:
             print(f"Error in get_coordinate: {e}")

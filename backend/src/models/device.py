@@ -3,9 +3,16 @@ from datetime import datetime
 
 
 class Device:
+    # Serial to friendly name mapping
+    SERIAL_NAME_MAP = {
+        "emulator-5554": "Kai",
+        "emulator-5564": "Cong Anh",
+        "emulator-5574": "My Hanh",
+    }
+
     def __init__(self, serial):
         self.serial = serial
-        self.name = serial  # For BlueStacks, name = serial (device ID)
+        self.name = self.SERIAL_NAME_MAP.get(serial, serial)  # Use mapping or fallback to serial
         self.status = "available"  # available, busy, offline
         self.last_seen = datetime.now()
         self.logs = []

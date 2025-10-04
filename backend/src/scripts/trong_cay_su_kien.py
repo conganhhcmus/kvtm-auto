@@ -16,8 +16,6 @@ from scripts.core import (
     go_last,
     plant_tree,
     harvest_tree,
-    make_items,
-    SellOption,
 )
 
 
@@ -43,40 +41,55 @@ def main():
     if game_options.open_game:
         open_game(manager)
 
-    for i in range(100):
-        print(f"{i}: Run vai xanh la")
-        if game_options.open_chest:
+    for i in range(1000):
+        print(f"{i}: Run trong cay su kien")
+        if game_options.open_chest and (i % 10) == 0:
             open_chest(manager)
 
-        for _ in range(10):
-            # auto
+        # Todo
+        if i == 0:
             go_up(manager)
-            plant_tree(manager, "chanh")
+            plant_tree(manager)
             go_up(manager, 2)
-            plant_tree(manager, "chanh")
-            go_down(manager, 2)
-            manager.sleep(6)
-
-            harvest_tree(manager)
-            plant_tree(manager, "bong", next=False)
+            plant_tree(manager)
             go_up(manager, 2)
-            harvest_tree(manager)
-            plant_tree(manager, "bong", 6)
-            go_down(manager, 2)
-
-            make_items(manager, 2, 3, 6)
-            harvest_tree(manager)
+            plant_tree(manager)
             go_up(manager, 2)
-            harvest_tree(manager)
-            make_items(manager, 1, 3, 6)
+            plant_tree(manager)
+            go_up(manager, 2)
+            plant_tree(manager)
             go_last(manager)
 
-        if game_options.sell_items:
-            sell_items(
-                manager,
-                SellOption.GOODS,
-                [{"key": "vai-xanh-la", "value": 6}],
-            )
+        if i < 999:
+            go_up(manager)
+            harvest_tree(manager)
+            plant_tree(manager)
+            go_up(manager, 2)
+            harvest_tree(manager)
+            plant_tree(manager)
+            go_up(manager, 2)
+            harvest_tree(manager)
+            plant_tree(manager)
+            go_up(manager, 2)
+            harvest_tree(manager)
+            plant_tree(manager)
+            go_up(manager, 2)
+            harvest_tree(manager)
+            plant_tree(manager)
+            go_last(manager)
+
+        else:
+            go_up(manager)
+            harvest_tree(manager)
+            go_up(manager, 2)
+            harvest_tree(manager)
+            go_up(manager, 2)
+            harvest_tree(manager)
+            go_up(manager, 2)
+            harvest_tree(manager)
+            go_up(manager, 2)
+            harvest_tree(manager)
+            go_last(manager)
 
         i += 1
 

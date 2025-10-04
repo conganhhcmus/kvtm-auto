@@ -81,28 +81,8 @@ class _MultiTouchController:
         """Convert screen coordinates to device coordinates for BlueStacks Virtual Touch"""
         device_x = int((screen_x / self.screen_width) * self.device_max_x)
         device_y = int((screen_y / self.screen_height) * self.device_max_y)
-        print(
-            f"Coordinate conversion: screen({screen_x},{screen_y}) -> device({device_x},{device_y})"
-        )
-        return device_x, device_y
 
-    @staticmethod
-    def _send_event(serial, device, event_type, event_code, value):
-        """Send touch event to device"""
-        cmd = [
-            "adb",
-            "-s",
-            serial,
-            "shell",
-            "sendevent",
-            device,
-            str(event_type),
-            str(event_code),
-            str(value),
-        ]
-        subprocess.run(
-            cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-        )
+        return device_x, device_y
 
 
 class AdbController:
@@ -171,7 +151,7 @@ class AdbController:
         )
         return result.stdout
 
-    def find_image_on_screen(self, template_path, threshold=0.8, max_retries=3):
+    def find_image_on_screen(self, template_path, threshold=0.9, max_retries=3):
         """Find template image on screen using bytes-based approach"""
         for attempt in range(max_retries):
             try:
@@ -182,15 +162,13 @@ class AdbController:
                 )
                 if coords:
                     return coords
-                if attempt < max_retries - 1:
-                    time.sleep(0.5)  # Wait before retry
+
             except Exception as e:
                 print(f"Error in find_image_on_screen (attempt {attempt + 1}): {e}")
-                if attempt < max_retries - 1:
-                    time.sleep(0.5)  # Wait before retry
+
         return None
 
-    def click_image(self, template_path, threshold=0.8, max_retries=3):
+    def click_image(self, template_path, threshold=0.9, max_retries=3):
         """Click on a template image found on screen using bytes-based approach"""
         for attempt in range(max_retries):
             try:
@@ -203,12 +181,10 @@ class AdbController:
                 if coords:
                     self.tap(*coords)
                     return True
-                if attempt < max_retries - 1:
-                    time.sleep(0.5)  # Wait before retry
+
             except Exception as e:
                 print(f"Error in click_image (attempt {attempt + 1}): {e}")
-                if attempt < max_retries - 1:
-                    time.sleep(0.5)  # Wait before retry
+
         return False
 
     def click_text(self, target_text, lang="eng", max_retries=3):
@@ -279,23 +255,50 @@ class AdbController:
         """Sleep for a given duration in seconds"""
         time.sleep(duration)
 
+    def swipe(self, x1, y1, x2, y2, duration=300):
+        """
+        Swipe from (x1, y1) to (x2, y2)
+
+        Args:
+            x1, y1: Starting coordinates
+            x2, y2: Ending coordinates
+            duration: Duration of swipe in milliseconds (default: 300)
+        """
+        subprocess.run(
+            [
+                "adb",
+                "-s",
+                self.serial,
+                "shell",
+                "input",
+                "swipe",
+                str(x1),
+                str(y1),
+                str(x2),
+                str(y2),
+                str(duration),
+            ],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
     # High-level gesture methods
 
-    def drag(self, points, steps=5):
+    def drag(self, points):
         """
-        Smooth drag using interpolated points at maximum speed.
+        Smooth drag through a series of points.
 
         Args:
             points: List of (x, y) coordinate tuples
-            steps: Number of interpolated points between each pair of points (default: 5)
 
         Examples:
-            # Fast drag with fewer interpolation steps
-            controller.drag([(100, 100), (300, 300)], steps=3)
+            # Drag through multiple points
+            controller.drag([(100, 100), (300, 300)])
 
-            # Smooth drag with many interpolation steps
+            # Complex path
             path = [(100, 100), (200, 100), (300, 200), (400, 300)]
-            controller.drag(path, steps=20)
+            controller.drag(path)
         """
         if not isinstance(points, (list, tuple)):
             raise ValueError("Points must be a list or tuple of coordinate pairs")
@@ -303,29 +306,11 @@ class AdbController:
         if len(points) < 2:
             raise ValueError("Need at least 2 points for drag gesture")
 
-        # Generate interpolated points for smooth movement
-        interpolated_points = [points[0]]  # Start with first point
-        for i in range(len(points) - 1):
-            start_x, start_y = points[i]
-            end_x, end_y = points[i + 1]
-
-            # Generate 'steps' intermediate points between start and end
-            for step in range(1, steps + 1):
-                t = step / steps  # Interpolation factor (0 to 1)
-                x = start_x + t * (end_x - start_x)
-                y = start_y + t * (end_y - start_y)
-                interpolated_points.append((int(x), int(y)))
-
-        print(
-            f"Starting optimized drag through {len(points)} points with "
-            f"{len(interpolated_points)} interpolated points"
-        )
-
         # Build single shell command with all sendevent operations
         device = self._multi_touch.device
         commands = []
 
-        for i, point in enumerate(interpolated_points):
+        for i, point in enumerate(points):
             device_x, device_y = self._multi_touch._convert_to_device_coords(
                 point[0], point[1]
             )
@@ -340,7 +325,6 @@ class AdbController:
                 ]
             )
 
-
         # Add release events
         commands.extend(
             [
@@ -351,7 +335,6 @@ class AdbController:
 
         # Execute single optimized command
         full_command = "; ".join(commands)
-        print(f"Executing single ADB command with {len(interpolated_points)} points")
 
         subprocess.run(
             ["adb", "-s", self.serial, "shell", full_command],
