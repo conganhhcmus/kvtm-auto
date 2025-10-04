@@ -2,181 +2,379 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project Overview
+
+**KVTM Auto** is a full-stack Android device automation platform for automating mobile games via ADB (Android Debug Bridge). The system uses:
+- **Backend**: Flask (Python 3.9+) on port 3001
+- **Frontend**: React 18 + TypeScript + Vite on port 3000 (proxies `/api` to backend)
+- **Core Technology**: ADB for device control, OpenCV for image matching, subprocess for script execution
+
 ## Development Commands
 
-### Local Development
-
-#### Backend (Python Flask)
+### Backend Development
 ```bash
 cd backend
-poetry install                           # Install dependencies
-cd src && poetry run python main.py      # Start development server (port 3001)
-poetry run black src/                    # Format code
-poetry run isort src/                    # Sort imports
-poetry run flake8 src/                   # Lint code
-poetry run mypy src/                     # Type checking
-poetry run pytest                        # Run tests
+poetry install                                    # Install dependencies
+poetry run python src/main.py --env dev          # Run dev server (port 3001, auto-reload)
+poetry run python src/main.py --env prod         # Run production server
+
+# Code Quality
+poetry run black src/                            # Format code
+poetry run isort src/                            # Sort imports
+poetry run flake8 src/                           # Lint code
+poetry run mypy src/                             # Type checking
+poetry run pytest                                # Run tests
 ```
 
-#### Frontend (React + Vite)
+### Frontend Development
 ```bash
 cd frontend
-npm install                    # Install dependencies
-npm run dev                   # Start development server (localhost:5173)
-npm run build                 # Build for production
-npm run lint                  # Lint code
-npm run format                # Fix linting issues
-npm run preview               # Preview built app
+npm install                                       # Install dependencies
+npm run dev                                       # Dev server (port 3000)
+npm run build                                     # Build for production
+npm run lint                                      # ESLint check
 ```
 
-### Docker Development
-```bash
-docker-compose up -d          # Start all services
-docker-compose down           # Stop all services
-docker-compose logs backend   # View backend logs
-docker-compose logs frontend  # View frontend logs
-docker-compose build          # Rebuild containers after code changes
+**Important**: Frontend proxies `/api` requests to `http://localhost:3001` (configured in `vite.config.ts`)
+
+## Architecture
+
+### Backend Structure (Flask + Blueprints)
+
+```
+backend/src/
+├── main.py                    # Flask app entry point
+├── apis/                      # API blueprints
+│   ├── device_apis.py         # Device endpoints
+│   ├── script_apis.py         # Script endpoints
+│   ├── execution_apis.py      # Execution control
+│   └── system_apis.py         # Health checks
+├── libs/                      # Core libraries
+│   ├── device_manager.py      # Device discovery & tracking (Singleton)
+│   ├── execution_manager.py   # Script execution via subprocess
+│   ├── script_manager.py      # Script loading & management
+│   ├── storage_manager.py     # File-based persistence (Singleton)
+│   ├── adb_controller.py      # ADB command wrapper
+│   └── image_controller.py    # OpenCV image matching
+├── models/                    # Data models
+│   ├── device.py              # Device model
+│   ├── script.py              # Script model
+│   ├── game_options.py        # Script options
+│   └── execution.py           # Running script model
+├── scripts/                   # Automation scripts
+│   └── core.py                # Shared utilities (open_game, plant_tree, etc.)
+├── data/                      # Runtime data
+│   ├── device_state.json      # Persisted device states
+│   └── logs/                  # Per-device log files
+└── assets/                    # Image templates for matching
 ```
 
-## Architecture Overview (Post-Refactoring)
+### Key Architectural Patterns
 
-### Backend Structure (`backend/src/`)
-- **main.py**: Flask application entry point with CORS and Blueprint registration
-- **apis/**: REST API endpoints using Flask Blueprints
-  - **device_apis.py**: Device management endpoints (`/api/devices`)
-  - **script_apis.py**: Script discovery and listing (`/api/scripts`)
-  - **execution_apis.py**: Script execution management (`/api/execute`)
-  - **system_apis.py**: Health check and system status (`/health`)
-- **libs/**: Core utility libraries
-  - **device_manager.py**: Android device discovery and management via ADB
-  - **script_manager.py**: Script file discovery and metadata
-  - **execution_manager.py**: Subprocess-based script execution
-  - **adb_controller.py**: ADB wrapper with image/text detection (OpenCV + Tesseract)
-- **scripts/**: Automation scripts directory
-  - **tap_example.py**: Example script demonstrating ADB interactions
-  - Scripts use direct ADB commands for device control
+1. **Singleton Managers**: `DeviceManager`, `StorageManager`, `ExecutionManager` use singleton pattern for shared state across requests
+2. **Subprocess Execution**: Scripts run as separate Python processes (not threads) for isolation
+3. **Background Threads**: Device discovery runs continuously, log capture runs per-execution
+4. **File-based Storage**: Device state saved to JSON, logs saved to individual files per device
 
-### Frontend Structure (`frontend/src/`)
-- **App.tsx**: Main application component
-- **api.ts**: Axios-based API client with interceptors
-- **components/**: React components for modals and UI elements
-  - **DeviceDetailModal.tsx**: Device information display
-  - **DeviceLogModal.tsx**: **NEW - Simple log format display**
-  - **Modal.tsx**: Base modal component
-  - **MultiSelect.tsx**: Multi-selection dropdown
-  - **SearchableSelect.tsx**: Searchable dropdown
-- Built with Vite 7.1.2 + React 18.2 + TypeScript 5+ + Tailwind CSS 3.3
+### Frontend Structure (React + TypeScript)
 
-### Script System - **CURRENT IMPLEMENTATION**
-Scripts are Python files that receive device_id as command line argument:
+```
+frontend/src/
+├── App.tsx                    # Main application component
+├── api.ts                     # API client (axios)
+├── components/
+│   ├── DeviceDetailModal.tsx # Device details view
+│   ├── DeviceLogModal.tsx    # Real-time logs display
+│   ├── Modal.tsx             # Base modal component
+│   ├── MultiSelect.tsx       # Device multi-select
+│   └── SearchableSelect.tsx  # Script selector
+```
+
+- Uses **TanStack Query v4** for data fetching and caching
+- State managed via React hooks
+- Tailwind CSS for styling
+
+## Core System Flows
+
+### Device Discovery & Management
+
+**DeviceManager** (`libs/device_manager.py`):
+- Runs background thread checking `adb devices` every 5 seconds
+- Automatically creates `Device` objects for new devices
+- Persists device state (name, status, screen_size) to `data/device_state.json`
+- Tracks device status: `available`, `busy`, `offline`
+- Fetches screen size via `adb shell wm size` and caches it
+
+**Device Serial to Name Mapping**:
 ```python
+SERIAL_NAME_MAP = {
+    "emulator-5554": "Kai",
+    "emulator-5564": "Cong Anh",
+    "emulator-5574": "My Hanh",
+}
+```
+
+### Script Execution Flow
+
+1. **Start Request** → `POST /api/execute/start`
+   - Validates device (must be `available`) and script
+   - Clears device logs
+   - Launches subprocess: `python -u <script_path> <device_id> [<game_options_json>]`
+   - Sets device status to `busy`
+   - Creates `RunningScript` tracking object
+   - Starts background thread to capture subprocess stdout
+
+2. **Log Capture** (background thread in `ExecutionManager._capture_logs`):
+   - Reads subprocess stdout line-by-line
+   - Appends to device logs with timestamps: `[HH:MM:SS]: <message>`
+   - Saves to `data/logs/<device_serial>.log`
+   - Cleans up device state when script completes or errors
+
+3. **Stop Request** → `POST /api/execute/stop`
+   - Terminates subprocess
+   - Waits for log thread to finish
+   - Sets device status back to `available`
+   - Saves device state
+
+### ADB Controller Features
+
+**AdbController** (`libs/adb_controller.py`) provides:
+
+**Basic Commands**:
+- `tap(x, y)` - Tap at coordinates
+- `tap_by_percent(percent_x, percent_y)` - Tap at percentage of screen
+- `swipe(x1, y1, x2, y2, duration)` - Swipe gesture
+- `press_key(keycode)` - Press Android key (HOME, BACK, etc.)
+- `open_app(package_name)` / `close_app(package_name)` - App control
+
+**Image-based Automation**:
+- `find_image_on_screen(template_path, threshold=0.9)` - Returns (x, y) or None
+- `click_image(template_path)` - Find and click image
+- `click_text(target_text, lang="eng")` - OCR-based text clicking
+
+**Advanced Gestures**:
+- `drag(points)` - Multi-point drag using `sendevent` for precise control
+- Supports complex paths through coordinate lists
+- Uses device coordinate conversion (screen coords → touch device coords)
+
+**Assets**: Image templates stored in `backend/assets/` directory
+
+## Writing Custom Scripts
+
+### Script Structure
+
+Scripts must be placed in `backend/src/scripts/` and follow this pattern:
+
+```python
+import json
 import sys
 import os
-from src.libs.adb_controller import MultiDeviceManager
+
+# Add backend/src to path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from libs.adb_controller import AdbController
+from models.game_options import GameOptions
+from scripts.core import open_game, open_chest, plant_tree, harvest_tree
 
 def main():
-    device_id = sys.argv[1]  # Device serial from command line
-    manager = MultiDeviceManager()
+    if len(sys.argv) < 2:
+        print("Usage: python script.py <device_id> [game_options_json]")
+        sys.exit(1)
 
-    # Direct ADB interactions
-    manager.tap(device_id, 500, 1000)  # Tap at coordinates
-    manager.click_text(device_id, "Submit")  # Click on text using OCR
+    device_id = sys.argv[1]
+    game_options = GameOptions()
 
-    # Image template matching
-    template_path = os.path.join("src", "assets", "button_template.png")
-    manager.click_image(device_id, template_path)
+    # Parse optional game options
+    if len(sys.argv) > 2:
+        try:
+            options_dict = json.loads(sys.argv[2])
+            game_options = GameOptions.from_dict(options_dict)
+        except json.JSONDecodeError:
+            print("Error: Invalid JSON format for game_options")
+            sys.exit(1)
+
+    # Initialize ADB controller
+    manager = AdbController(device_id)
+
+    # Use game options to control behavior
+    if game_options.open_game:
+        open_game(manager)
+
+    # Your automation logic here
+    for i in range(100):
+        print(f"Loop {i}: Doing something...")
+        plant_tree(manager, "tree-type")
+        manager.sleep(5)
+        harvest_tree(manager)
+
+    print("Script completed")
 
 if __name__ == "__main__":
     main()
-    
 ```
 
-### Device Management
-- ADB integration for Android device control
-- **Subprocess-only script execution** (no threading complexity)
-- **Simple log format**: `[Time]: [Action] [Index]`
-- Real-time device status tracking
+### Script Discovery
 
-### Key Integrations - **CURRENT**
-- **ADB**: Direct subprocess calls to Android Debug Bridge for device control
-- **OpenCV**: Image template matching and computer vision (v4.8.1+)
-- **Tesseract**: OCR text recognition for UI automation
-- **Flask**: Web framework with Blueprint architecture and CORS support
-- **NumPy/Pillow**: Image processing and manipulation
-- **Threading**: Background device discovery via ADB polling
+**ScriptManager** automatically discovers scripts:
+- Scans `backend/src/scripts/` for `.py` files
+- Excludes files matching patterns in `.ignore` file
+- Generates script ID from filename (e.g., `vai_tim.py` → `vai_tim`)
+- Generates display name by title-casing (e.g., `vai_tim` → `Vai Tim`)
 
-## Development Workflow
+### Shared Utilities (scripts/core.py)
 
-1. **Local Development**: Use Poetry + npm for fast iteration
-2. **Docker Development**: Use for production-like testing
-3. **Adding New Scripts**: Use new simple logging format with `_core.py` utilities
-4. **Backend Changes**: Rely on global exception handler, avoid try-catch
-5. **Frontend Changes**: Use unified API models from `models/api.py`
-6. **Shell Commands**: Use `Shell` class for command building
+Common automation functions available:
 
-## Important Notes - **UPDATED**
+**Game Management**:
+- `open_game(manager)` - Open game app, wait for load, close popups
+- `open_chest(manager)` - Open available chests
+- `go_up(manager, times=1)` / `go_down(manager, times=1)` - Navigation
+- `go_last(manager)` - Navigate to last position
 
-### **Deployment Options**
-- **Local Development**: Backend (3001) + Frontend (5173) separate processes
-- **Docker**: Backend (3001) + Frontend (3000) containerized
+**Farming Automation**:
+- `plant_tree(manager, tree=None, num=12, next=True)` - Plant trees in grid
+- `harvest_tree(manager)` - Harvest all trees
+- `make_items(manager, floor=1, slot=0, num=1)` - Craft items
 
-### **Current Architecture Benefits**
-- **Flask Blueprint structure** - Modular API organization
-- **Subprocess execution** - Isolated script execution
-- **ADB integration** - Direct Android device control
-- **Computer vision** - OpenCV + Tesseract for UI automation
-- **Background discovery** - Automatic device detection
+**Market**:
+- `sell_items(manager, option: SellOption, items)` - Sell items at market
+- SellOption enum: `TREES=0, GOODS=1, OTHERS=2, MINERAL=3, EVENTS=4`
 
-### **Architecture**
-- Backend (Flask): port 3001 with health check at `/health`
-- Frontend: localhost:5173 (local dev) or localhost:3000 (Docker)
-- API endpoints: `/api/devices`, `/api/scripts`, `/api/execute`
-- Scripts executed as subprocesses with device_id parameter
-- ADB integration for Android device automation
-- Image/text recognition for UI automation
+**Core Utilities**:
+- `_close_all_popup(manager, num=10)` - Close popups via BACK key
 
-### **Script Development Guidelines**
-- Scripts receive `device_id` as command line argument
-- Use `MultiDeviceManager` for all ADB interactions
-- Image templates stored in `src/assets/` for matching
-- OCR text detection with Tesseract integration
-- Process isolation ensures stability
+## Important Implementation Details
 
-### **Development**
-- Backend: `cd backend/src && poetry run python main.py` (port 3001)
-- Frontend: `npm run dev` (port 5173)
-- Docker: `docker-compose up` for full-stack testing
-- Scripts executed via subprocess with device serial parameter
-- Device logs stored in Device objects for UI display
+### Logging System
 
-## Testing & Quality Assurance
+**Log Format**: All logs timestamped with `[HH:MM:SS]: <message>` format
 
-### Backend Testing
+**Storage**:
+- Logs saved to `backend/src/data/logs/<device_serial>.log`
+- Thread-safe file operations via `StorageManager._file_lock`
+- `device.add_log(message)` - Append log
+- `device.get_logs(limit=100)` - Retrieve recent logs
+- `device.clear_logs()` - Clear all logs
+
+**Real-time Updates**:
+- Frontend polls logs via `GET /api/devices/{device_id}/logs`
+- Subprocess output captured line-by-line and streamed to logs
+- Use `python -u` flag for unbuffered output
+
+### Game Options
+
+**GameOptions Model** (`models/game_options.py`):
+```python
+class GameOptions:
+    def __init__(self, open_game=False, open_chest=False, sell_items=False):
+        self.open_game = open_game
+        self.open_chest = open_chest
+        self.sell_items = sell_items
+```
+
+Passed from frontend to scripts as JSON argument.
+
+### Multi-Touch & Gestures
+
+**Drag Implementation**:
+- Uses low-level `sendevent` commands for precise touch control
+- Converts screen coordinates to device coordinates (0-32767 range for BlueStacks)
+- Supports complex multi-point paths
+- Default touch device: `/dev/input/event2`
+
+**Example**:
+```python
+# Drag item to multiple planting locations
+points = [(slot_x, slot_y), (720, 900), (890, 900), (1060, 900)]
+manager.drag(points)
+```
+
+### Image Matching
+
+**OpenCV-based Detection**:
+- Templates stored in `backend/assets/` directory
+- Default threshold: 0.9 (90% match)
+- Auto-retry up to 3 times with 0.5s delay
+- Returns center coordinates of matched region
+
+**Image Assets Paths**:
+- Can use relative path: `"cay/oai-huong"` → searches `assets/cay/oai-huong.png`
+- Or just filename: `"game"` → searches `assets/game.png`
+
+## API Endpoints
+
+### Devices
+- `GET /api/devices` - List all devices
+- `GET /api/devices/{device_id}` - Get device details
+- `GET /api/devices/{device_id}/logs` - Get device logs
+
+### Scripts
+- `GET /api/scripts` - List available scripts
+
+### Execution
+- `POST /api/execute/start` - Start script on device
+  - Body: `{ device_id, script_id, game_options }`
+  - Returns: `{ execution_id, status, device, script }`
+- `POST /api/execute/stop` - Stop specific execution
+  - Body: `{ execution_id }`
+- `POST /api/execute/stop-all` - Stop all running scripts
+
+### System
+- `GET /health` - Health check endpoint
+
+## Testing & Debugging
+
+### Script Testing
+
+**Direct Execution** (faster for development):
 ```bash
 cd backend
-poetry run pytest                        # Run all tests
-poetry run pytest test/ -v               # Run with verbose output
-poetry run pytest --cov=src test/        # Run with coverage report
+poetry run python src/scripts/vai_tim.py emulator-5554 '{"open_game":true}'
 ```
 
-### Code Quality Commands (run these before commits)
+**Via API** (full integration test):
+1. Start backend: `poetry run python src/main.py --env dev`
+2. Use frontend or curl:
 ```bash
-# Backend
-cd backend
-poetry run black src/                    # Format code
-poetry run isort src/                    # Sort imports
-poetry run flake8 src/                   # Lint code
-poetry run mypy src/                     # Type checking
-
-# Frontend  
-cd frontend
-npm run lint                             # ESLint check
-npm run format                           # Fix ESLint issues
-npm run build                            # Verify build works
+curl -X POST http://localhost:3001/api/execute/start \
+  -H "Content-Type: application/json" \
+  -d '{
+    "device_id": "emulator-5554",
+    "script_id": "vai_tim",
+    "game_options": {"open_game": true}
+  }'
 ```
 
-- Python 3.9+ installation with pyenv
-- Poetry dependency management
-- ADB and Tesseract OCR setup
-- Development workflow commands
-- The frontend and backend is running in dev now. No need to run again
+### Common Issues
+
+**Devices Not Appearing**:
+- Check `adb devices` shows devices
+- Ensure USB debugging enabled
+- Check backend logs for discovery errors
+
+**Script Execution Fails**:
+- Check script has correct shebang and imports
+- Verify device is `available` (not `busy` or `offline`)
+- Check logs: `GET /api/devices/{device_id}/logs`
+
+**Image Matching Fails**:
+- Verify template exists in `assets/` directory
+- Check image threshold (lower if needed)
+- Ensure screen resolution matches template expectations
+
+## Performance Considerations
+
+1. **Device Discovery**: Runs every 5 seconds - adjust if needed in `DeviceManager._start_discovery()`
+2. **Log Streaming**: Line-buffered subprocess output for real-time updates
+3. **Image Matching**: Max 3 retries with 0.5s delay - adjust `max_retries` parameter
+4. **File Locks**: StorageManager uses threading.Lock for thread-safe file operations
+
+## Recent Changes
+
+The README mentions a v2.0 refactoring that was planned but **NOT YET IMPLEMENTED**. Current implementation uses:
+- Flask (not FastAPI as mentioned in README)
+- Threading for log capture (README mentions subprocess-only)
+- No unified API models or simplified logging format yet
+
+**Current State**: Flask-based backend with standard Python logging, threading for execution management.

@@ -1,3 +1,4 @@
+import argparse
 from flask import Flask, jsonify
 from flask_cors import CORS
 
@@ -23,4 +24,13 @@ def hello_world():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=3001, debug=True)
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--env", choices=["dev", "prod"], default="dev", help="Environment: dev or prod"
+    )
+
+    args = parser.parse_args()
+    if args.env == "dev":
+        app.run(host="0.0.0.0", port=3001, debug=True)  # auto reload
+    else:
+        app.run(host="0.0.0.0", port=3001, debug=False)  # no reload

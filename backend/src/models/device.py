@@ -1,5 +1,6 @@
-import threading
 from datetime import datetime
+
+from libs.storage_manager import StorageManager
 
 
 class Device:
@@ -12,27 +13,29 @@ class Device:
 
     def __init__(self, serial):
         self.serial = serial
-        self.name = self.SERIAL_NAME_MAP.get(serial, serial)  # Use mapping or fallback to serial
+        self.name = self.SERIAL_NAME_MAP.get(
+            serial, serial
+        )  # Use mapping or fallback to serial
         self.status = "available"  # available, busy, offline
         self.last_seen = datetime.now()
-        self.logs = []
         self.current_script = None
-        self.current_execution_id = None  # Track current execution ID for running scripts
+        self.current_execution_id = (
+            None  # Track current execution ID for running scripts
+        )
         self.screen_size = None  # [width, height] - will be populated during discovery
-        self._log_lock = threading.Lock()  # Thread-safe log operations
+        self._storage = StorageManager()
 
     def add_log(self, log_entry):
-        """Thread-safe method to add log entry with size limit"""
-        with self._log_lock:
-            self.logs.append(log_entry)
-            # Keep only last 1000 logs to prevent memory issues
-            if len(self.logs) > 1000:
-                self.logs = self.logs[-1000:]
+        """Add log entry to file"""
+        self._storage.append_log(self.serial, log_entry)
 
     def get_logs(self, limit=100):
-        """Get recent logs with optional limit"""
-        with self._log_lock:
-            return self.logs[-limit:] if limit else self.logs[:]
+        """Get recent logs from file"""
+        return self._storage.read_logs(self.serial, limit)
+
+    def clear_logs(self):
+        """Clear all logs for this device"""
+        self._storage.clear_logs(self.serial)
 
     def to_dict(self):
         return {

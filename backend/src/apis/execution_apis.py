@@ -29,6 +29,9 @@ def start_script():
     if not script:
         return jsonify({"error": "Script not found"}), 404
 
+    # Clear device logs before starting script
+    device.clear_logs()
+
     try:
         running_script = execution_manager.start_script(
             device_id, script_id, script.path, game_options

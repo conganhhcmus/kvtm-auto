@@ -104,6 +104,9 @@ class ExecutionManager:
             completion_log = f"[{timestamp}]: Script execution stopped"
             device.add_log(completion_log)
 
+            # Save device state after stopping
+            self.device_manager._save_device_states()
+
             del self.running_scripts[execution_id]
             return True
         except Exception as e:
@@ -155,6 +158,11 @@ class ExecutionManager:
             completion_log = f"[{timestamp}]: Script execution completed"
             device.add_log(completion_log)
 
+            # Save device state after completion
+            from libs.device_manager import DeviceManager
+            device_manager = DeviceManager()
+            device_manager._save_device_states()
+
             # Remove from running scripts
             if running_script.id in self.running_scripts:
                 del self.running_scripts[running_script.id]
@@ -169,6 +177,11 @@ class ExecutionManager:
             device.status = "available"
             device.current_script = None
             device.current_execution_id = None
+
+            # Save device state after error
+            from libs.device_manager import DeviceManager
+            device_manager = DeviceManager()
+            device_manager._save_device_states()
 
             # Remove from running scripts
             if running_script.id in self.running_scripts:

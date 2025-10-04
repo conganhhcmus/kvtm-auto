@@ -211,7 +211,7 @@ function App() {
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-500 via-purple-600 to-indigo-700">
             <div className="container mx-auto px-4 py-4 sm:py-8 max-w-7xl">
-                <div className="text-center mb-12">
+                <div className="text-center mb-8">
                     <div className="space-y-3">
                         <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white mb-3 tracking-tight">
                             <span className="bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent drop-shadow-lg">

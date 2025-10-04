@@ -1,0 +1,14 @@
+{
+  "name": "@kvtm-auto/backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "KVTM Auto - Backend (Flask + Python)",
+  "scripts": {
+    "dev": "poetry run python src/main.py --env dev",
+    "build": "echo 'Backend build: No build step required for Flask'",
+    "lint": "poetry run flake8 src/",
+    "format": "poetry run black src/ && poetry run isort src/",
+    "test": "poetry run pytest",
+    "clean": "find . -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true"
+  }
+}

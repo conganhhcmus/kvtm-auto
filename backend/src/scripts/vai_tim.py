@@ -44,7 +44,7 @@ def main():
         open_game(manager)
 
     for i in range(100):
-        print(f"{i}: Run vai xanh la")
+        print(f"{i}: Run vai tim")
         if game_options.open_chest:
             open_chest(manager)
 

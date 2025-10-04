@@ -1,0 +1,24 @@
+{
+  "emulator-5554": {
+    "name": "Kai",
+    "status": "available",
+    "last_seen": "2025-10-04T20:54:30.674213",
+    "current_script": null,
+    "current_execution_id": null,
+    "screen_size": [
+      1920,
+      1080
+    ]
+  },
+  "emulator-5574": {
+    "name": "My Hanh",
+    "status": "available",
+    "last_seen": "2025-10-04T20:54:30.674245",
+    "current_script": null,
+    "current_execution_id": null,
+    "screen_size": [
+      1920,
+      1080
+    ]
+  }
+}
