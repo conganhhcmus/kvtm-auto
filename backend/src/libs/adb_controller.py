@@ -1,9 +1,50 @@
 import os
 import subprocess
 import time
+import threading
+from functools import wraps
 
 from enum import Enum
 from .image_controller import image_controller
+
+
+def retry_on_error(max_attempts=3, delay=0.5, return_value=None, skip_log=True):
+    """
+    Decorator to retry a function on error.
+
+    Args:
+        max_attempts: Maximum number of attempts (default: 3)
+        delay: Delay between attempts in seconds (default: 0.5)
+        return_value: Value to return on final failure (default: None)
+    """
+
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            for attempt in range(max_attempts):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    if attempt < max_attempts - 1:
+                        if not skip_log:
+                            print(
+                                f"Error in {func.__name__} (attempt {attempt + 1}/{max_attempts}): {e}"
+                            )
+                        time.sleep(delay)
+                    else:
+                        if not skip_log:
+                            print(
+                                f"Error in {func.__name__} (attempt {attempt + 1}/{max_attempts}): {e}"
+                            )
+                            print(
+                                f"{func.__name__} failed after {max_attempts} attempts"
+                            )
+                        return return_value
+            return return_value
+
+        return wrapper
+
+    return decorator
 
 
 class EventCode(Enum):
@@ -59,30 +100,106 @@ class KeyCode(Enum):
     ESC = 111
 
 
-class _MultiTouchController:
-    """Private controller for managing multiple touch pointers on a device"""
+class _ShellSession:
+    """Manages a persistent ADB shell session for a device"""
 
-    def __init__(self, serial, screen_width, screen_height):
+    def __init__(self, serial):
         self.serial = serial
-        self.device = (
-            "/dev/input/event2"  # Default touch device path for most emulators/devices
-        )
-        self.pointers = {}  # {pointer_id: (x, y, slot)}
-        self.slots = {}  # {slot: pointer_id} - track which pointer uses which slot
-        self.available_slots = list(range(10))  # Support up to 10 simultaneous touches
-        self.next_pointer_id = 0
-        # BlueStacks Virtual Touch uses 0-32767 coordinate range
-        self.device_max_x = 32767
-        self.device_max_y = 32767
-        self.screen_width = screen_width
-        self.screen_height = screen_height
+        self._process = None
+        self._lock = threading.Lock()
+        self._marker = f"<<<CMD_DONE_{serial}>>>"
+        self._start_shell()
 
-    def _convert_to_device_coords(self, screen_x, screen_y):
-        """Convert screen coordinates to device coordinates for BlueStacks Virtual Touch"""
-        device_x = int((screen_x / self.screen_width) * self.device_max_x)
-        device_y = int((screen_y / self.screen_height) * self.device_max_y)
+    def _start_shell(self):
+        """Start the persistent shell subprocess"""
+        try:
+            self._process = subprocess.Popen(
+                ["adb", "-s", self.serial, "shell"],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                bufsize=1,  # Line buffered
+            )
+        except Exception as e:
+            print(f"Error starting shell session for {self.serial}: {e}")
+            self._process = None
 
-        return device_x, device_y
+    def _ensure_running(self):
+        """Ensure shell is running, restart if needed"""
+        if self._process is None or self._process.poll() is not None:
+            if self._process is not None:
+                print(f"Shell session died for {self.serial}, restarting...")
+            self._start_shell()
+
+    def execute(self, command, timeout=5):
+        """
+        Execute a command in the shell and wait for completion.
+
+        Args:
+            command: Shell command to execute
+            timeout: Maximum time to wait for command completion (seconds)
+
+        Returns:
+            True if command executed successfully, False otherwise
+        """
+        with self._lock:
+            try:
+                self._ensure_running()
+                if self._process is None:
+                    return False
+
+                # Send command followed by marker
+                full_command = f"{command} 2>&1; echo '{self._marker}'\n"
+                self._process.stdin.write(full_command)
+                self._process.stdin.flush()
+
+                # Wait for marker in output
+                start_time = time.time()
+                while time.time() - start_time < timeout:
+                    line = self._process.stdout.readline()
+                    if self._marker in line:
+                        return True
+
+                # Timeout - kill and restart shell
+                print(f"Command timed out for {self.serial}: {command}")
+                try:
+                    self._process.kill()
+                    self._process.wait(timeout=1)
+                except Exception:
+                    pass
+                self._process = None
+                self._start_shell()  # Restart shell for next command
+                return False
+
+            except Exception as e:
+                print(f"Error executing command in shell for {self.serial}: {e}")
+                # Clean up process before setting to None
+                if self._process:
+                    try:
+                        self._process.kill()
+                        self._process.wait(timeout=1)
+                    except Exception:
+                        pass
+                self._process = None
+                return False
+
+    def close(self):
+        """Close the shell session"""
+        if self._process:
+            try:
+                self._process.stdin.write("exit\n")
+                self._process.stdin.flush()
+                self._process.wait(timeout=2)
+            except Exception:
+                pass
+            finally:
+                try:
+                    self._process.terminate()
+                    self._process.wait(timeout=1)
+                except Exception:
+                    self._process.kill()
+                self._process = None
 
 
 class AdbController:
@@ -91,10 +208,16 @@ class AdbController:
 
     def __init__(self, serial):
         self.serial = serial
+        self._shell = _ShellSession(serial)
         self.screen_width, self.screen_height = self._get_screen_size()
-        self._multi_touch = _MultiTouchController(
-            self.serial, self.screen_width, self.screen_height
+
+        # Touch device attributes
+        self.touch_device = (
+            "/dev/input/event2"  # Default touch device path for most emulators/devices
         )
+        # BlueStacks Virtual Touch uses 0-32767 coordinate range
+        self.device_max_x = 32767
+        self.device_max_y = 32767
 
     def _get_screen_size(self):
         """Get device screen size"""
@@ -124,24 +247,21 @@ class AdbController:
             # Just a filename, look in assets directory
             return os.path.join(self.ASSETS_DIR, image_path)
 
+    def _convert_to_device_coords(self, screen_x, screen_y):
+        """Convert screen coordinates to device coordinates for BlueStacks Virtual Touch"""
+        device_x = int((screen_x / self.screen_width) * self.device_max_x)
+        device_y = int((screen_y / self.screen_height) * self.device_max_y)
+        return device_x, device_y
+
+    @retry_on_error(return_value=False, skip_log=False)
     def tap(self, x, y):
         """Simulate a tap at (x, y)"""
-        subprocess.run(
-            ["adb", "-s", self.serial, "shell", "input", "tap", str(x), str(y)],
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        result = self._shell.execute(f"input tap {x} {y}")
+        if not result:
+            raise Exception(f"Failed to tap at ({x}, {y})")
+        return result
 
-    def tap_by_percent(self, percent_x, percent_y):
-        """Simulate a tap at percentage coordinates (0-100)"""
-        if not (0 <= percent_x <= 100 and 0 <= percent_y <= 100):
-            raise ValueError("Percentage coordinates must be between 0 and 100")
-
-        x = int(self.screen_width * percent_x / 100)
-        y = int(self.screen_height * percent_y / 100)
-        self.tap(x, y)
-
+    @retry_on_error(skip_log=False)
     def capture_screen(self):
         """Capture device screen as PNG bytes"""
         result = subprocess.run(
@@ -151,110 +271,83 @@ class AdbController:
         )
         return result.stdout
 
-    def find_image_on_screen(self, template_path, threshold=0.9, max_retries=3):
+    @retry_on_error()
+    def find_image_on_screen(self, template_path, threshold=0.9):
         """Find template image on screen using bytes-based approach"""
-        for attempt in range(max_retries):
-            try:
-                screen_bytes = self.capture_screen()
-                template_bytes = image_controller.read_asset_image_bytes(template_path)
-                coords = image_controller.get_coordinate(
-                    screen_bytes, template_bytes, threshold
-                )
-                if coords:
-                    return coords
+        screen_bytes = self.capture_screen()
+        template_bytes = image_controller.read_asset_image_bytes(template_path)
+        coords = image_controller.get_coordinate(
+            screen_bytes, template_bytes, threshold
+        )
+        if coords:
+            return coords
+        raise Exception("Image not found on screen")
 
-            except Exception as e:
-                print(f"Error in find_image_on_screen (attempt {attempt + 1}): {e}")
-
-        return None
-
-    def click_image(self, template_path, threshold=0.9, max_retries=3):
+    @retry_on_error(return_value=False)
+    def click_image(self, template_path, threshold=0.9):
         """Click on a template image found on screen using bytes-based approach"""
-        for attempt in range(max_retries):
-            try:
-                screen_bytes = self.capture_screen()
-                template_bytes = image_controller.read_asset_image_bytes(template_path)
-                coords = image_controller.get_coordinate(
-                    screen_bytes, template_bytes, threshold
-                )
+        screen_bytes = self.capture_screen()
+        template_bytes = image_controller.read_asset_image_bytes(template_path)
+        coords = image_controller.get_coordinate(
+            screen_bytes, template_bytes, threshold
+        )
 
-                if coords:
-                    self.tap(*coords)
-                    return True
+        if coords:
+            self.tap(*coords)
+            return True
+        raise Exception("Image not found on screen")
 
-            except Exception as e:
-                print(f"Error in click_image (attempt {attempt + 1}): {e}")
-
-        return False
-
-    def click_text(self, target_text, lang="eng", max_retries=3):
+    @retry_on_error(return_value=False)
+    def click_text(self, target_text, lang="eng"):
         """Click on text found on screen using bytes-based approach"""
-        for attempt in range(max_retries):
-            try:
-                screen_bytes = self.capture_screen()
-                coords = image_controller.find_text_in_image_bytes(
-                    screen_bytes, target_text, lang
-                )
-                if coords:
-                    self.tap(*coords)
-                    return True
-                if attempt < max_retries - 1:
-                    time.sleep(0.5)  # Wait before retry
-            except Exception as e:
-                print(f"Error in click_text (attempt {attempt + 1}): {e}")
-                if attempt < max_retries - 1:
-                    time.sleep(0.5)  # Wait before retry
-        return False
+        screen_bytes = self.capture_screen()
+        coords = image_controller.find_text_in_image_bytes(
+            screen_bytes, target_text, lang
+        )
+        if coords:
+            self.tap(*coords)
+            return True
+        raise Exception(f"Text '{target_text}' not found on screen")
 
+    @retry_on_error(return_value=False, skip_log=False)
     def press_key(self, keycode):
         """Press a key using Android keycode"""
-        subprocess.run(
-            ["adb", "-s", self.serial, "shell", "input", "keyevent", str(keycode)],
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        result = self._shell.execute(f"input keyevent {keycode}")
+        if not result:
+            raise Exception(f"Failed to press key {keycode}")
+        return result
 
+    @retry_on_error(return_value=False, skip_log=False)
     def close_app(self, package_name: str):
         """Force stop an app by package name"""
-        subprocess.run(
-            ["adb", "-s", self.serial, "shell", "am", "force-stop", package_name],
-            check=True,
-        )
+        result = self._shell.execute(f"am force-stop {package_name}")
+        if not result:
+            raise Exception(f"Failed to close app {package_name}")
+        return result
 
+    @retry_on_error(return_value=False, skip_log=False)
     def open_app(self, package_name: str):
         """Open an app by package name"""
-        subprocess.run(
-            [
-                "adb",
-                "-s",
-                self.serial,
-                "shell",
-                "monkey",
-                "-p",
-                package_name,
-                "-c",
-                "android.intent.category.LAUNCHER",
-                "1",
-            ],
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+        result = self._shell.execute(
+            f"monkey -p {package_name} -c android.intent.category.LAUNCHER 1"
         )
+        if not result:
+            raise Exception(f"Failed to open app {package_name}")
+        return result
 
+    @retry_on_error(return_value=False, skip_log=False)
     def kill_monkey(self):
         """Kill all monkey processes on device"""
-        subprocess.run(
-            ["adb", "-s", self.serial, "shell", "pkill", "-f", "monkey"],
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        result = self._shell.execute("pkill -f monkey")
+        if not result:
+            raise Exception("Failed to kill monkey process")
+        return result
 
     def sleep(self, duration):
         """Sleep for a given duration in seconds"""
         time.sleep(duration)
 
+    @retry_on_error(return_value=False, skip_log=False)
     def swipe(self, x1, y1, x2, y2, duration=300):
         """
         Swipe from (x1, y1) to (x2, y2)
@@ -264,27 +357,14 @@ class AdbController:
             x2, y2: Ending coordinates
             duration: Duration of swipe in milliseconds (default: 300)
         """
-        subprocess.run(
-            [
-                "adb",
-                "-s",
-                self.serial,
-                "shell",
-                "input",
-                "swipe",
-                str(x1),
-                str(y1),
-                str(x2),
-                str(y2),
-                str(duration),
-            ],
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        result = self._shell.execute(f"input swipe {x1} {y1} {x2} {y2} {duration}")
+        if not result:
+            raise Exception(f"Failed to swipe from ({x1}, {y1}) to ({x2}, {y2})")
+        return result
 
     # High-level gesture methods
 
+    @retry_on_error(return_value=False, skip_log=False)
     def drag(self, points):
         """
         Smooth drag through a series of points.
@@ -307,13 +387,11 @@ class AdbController:
             raise ValueError("Need at least 2 points for drag gesture")
 
         # Build single shell command with all sendevent operations
-        device = self._multi_touch.device
+        device = self.touch_device
         commands = []
 
-        for i, point in enumerate(points):
-            device_x, device_y = self._multi_touch._convert_to_device_coords(
-                point[0], point[1]
-            )
+        for point in points:
+            device_x, device_y = self._convert_to_device_coords(point[0], point[1])
 
             # Touch events for this point
             commands.extend(
@@ -335,10 +413,12 @@ class AdbController:
 
         # Execute single optimized command
         full_command = "; ".join(commands)
+        result = self._shell.execute(full_command, timeout=30)
+        if not result:
+            raise Exception(f"Failed to drag through {len(points)} points")
+        return result
 
-        subprocess.run(
-            ["adb", "-s", self.serial, "shell", full_command],
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+    def close(self):
+        """Close the ADB controller and cleanup resources"""
+        if self._shell:
+            self._shell.close()

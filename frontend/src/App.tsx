@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { deviceApi, scriptApi, executeApi, GameOptions, ScriptResponse } from '@/api'
-import { Play, Square, ChevronDown, ChevronUp, MonitorOff, ScrollText } from 'lucide-react'
+import { deviceApi, scriptApi, executeApi, GameOptions, Script } from '@/api'
+import { Play, Square, ChevronDown, ChevronUp, MonitorOff, ScrollText, Info, Monitor } from 'lucide-react'
 import DeviceDetailModal from '@/components/DeviceDetailModal'
 import DeviceLogModal from '@/components/DeviceLogModal'
 import SearchableSelect from '@/components/SearchableSelect'
@@ -14,11 +14,7 @@ interface Device {
     last_seen: string
     current_script: string | null
     current_execution_id: string | null
-    screen_size: [number, number] | null
 }
-
-// Using ScriptResponse interface from api.ts
-
 
 function App() {
     const queryClient = useQueryClient()
@@ -105,17 +101,14 @@ function App() {
             // Immediately invalidate and refetch for faster UI update
             queryClient.invalidateQueries({ queryKey: ['devices'] })
             queryClient.refetchQueries({ queryKey: ['devices'] })
-            
+
             // Log detailed results for debugging
             const result = response.data
-            console.log(`Stop All completed: ${result.message}`)
-            
-            if (result.failed_devices.length > 0) {
-                console.warn('Some devices failed to stop:', result.device_details.filter((d: { status: string }) => d.status === 'failed'))
+            console.log(`Stop All completed: stopped ${result.stopped_count} device(s)`)
+
+            if (result.errors.length > 0) {
+                console.warn('Some devices failed to stop:', result.errors)
             }
-            
-            // Show success feedback
-            console.log(`Successfully stopped ${result.stopped_devices.length}/${result.total_devices} devices`)
         },
         onError: (error) => {
             console.error('Stop All failed:', error)
@@ -141,21 +134,18 @@ function App() {
 
     // Convert devices and scripts to options format
     const deviceOptions = devices.map((device: Device) => {
-        const isRunning = device.current_script && device.status === 'busy'
-        const screenSizeText = device.screen_size ? ` | ${device.screen_size[0]}x${device.screen_size[1]}` : ''
+        const isRunning = !!(device.current_script && device.status === 'busy')
         return {
             value: device.id,
             label: device.name,
-            description: `Status: ${device.status}${screenSizeText}${isRunning ? ' (Running - Cannot select)' : ''}`,
+            description: `Status: ${device.status}${isRunning ? ' (Running - Cannot select)' : ''}`,
             disabled: isRunning
         }
     })
 
-    const scriptOptions = scripts.map((script: ScriptResponse) => ({
+    const scriptOptions = scripts.map((script: Script) => ({
         value: script.id,
         label: script.name,
-        description: script.description,
-        recommend: script.recommend
     }))
 
     const handleRunNow = () => {
@@ -203,7 +193,7 @@ function App() {
 
     const getScriptDisplayName = (scriptId: string | null | undefined): string => {
         if (!scriptId) return 'No script';
-        const script = scripts.find((s: ScriptResponse) => s.id === scriptId);
+        const script = scripts.find((s: Script) => s.id === scriptId);
         return script ? script.name : scriptId; // Fallback to ID if name not found
     }
 
@@ -363,11 +353,6 @@ function App() {
                                             <p className="text-xs text-gray-500 mt-1">
                                                 Last seen: {new Date(device.last_seen).toLocaleString()}
                                             </p>
-                                            {device.screen_size && (
-                                                <p className="text-xs text-gray-500 mt-1">
-                                                    Screen: {device.screen_size[0]}x{device.screen_size[1]}
-                                                </p>
-                                            )}
                                             <div className="flex items-center mt-2">
                                                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse mr-2"></div>
                                                 <span className="text-sm text-green-700 font-medium">Running</span>
@@ -393,10 +378,11 @@ function App() {
                                                     </>
                                                 )}
                                             </button>
-                                            <button 
-                                                onClick={() => handleViewDevice(device.id)}
+                                            <button
+                                                onClick={() => alert("Support later")}
                                                 className="inline-flex items-center justify-center px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium transition-colors min-w-[80px]"
                                             >
+                                                <Monitor className="w-4 h-4 mr-1" />
                                                 View
                                             </button>
                                             <button 
@@ -410,6 +396,7 @@ function App() {
                                                 onClick={() => handleViewDevice(device.id)}
                                                 className="inline-flex items-center justify-center px-3 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 text-sm font-medium transition-colors min-w-[80px]"
                                             >
+                                                <Info className="w-4 h-4 mr-1" />
                                                 Detail
                                             </button>
                                         </div>

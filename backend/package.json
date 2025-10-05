@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "poetry run python src/main.py --env dev",
     "build": "echo 'Backend build: No build step required for Flask'",
+    "prod": "poetry run gunicorn -w 4 -b 0.0.0.0:3001 --timeout 120 src.main:app",
     "lint": "poetry run flake8 src/",
     "format": "poetry run black src/ && poetry run isort src/",
     "test": "poetry run pytest",

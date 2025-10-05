@@ -8,27 +8,16 @@ export interface GameOptions {
     sell_items?: boolean
 }
 
-export interface ScriptResponse {
+export interface Script {
     id: string
     name: string
-    description?: string
-    order: number
-    recommend: boolean
+    created: string
+    path: string
 }
 
 export interface ScriptListResponse {
-    scripts: ScriptResponse[]
+    scripts: Script[]
     total: number
-}
-
-export interface ScriptDetailResponse {
-    id: string
-    name: string
-    description?: string
-    order: number
-    recommend: boolean
-    path?: string
-    last_modified?: string
 }
 
 export interface DeviceDetail {
@@ -37,24 +26,26 @@ export interface DeviceDetail {
     status: string
     last_seen: string
     current_script: string | null
+    current_script_name?: string | null
     current_execution_id: string | null
-    screen_size: [number, number] | null
     device_name?: string
-    script_name?: string
     game_options?: GameOptions
-    model?: string
-    android_version?: string
-    api_level?: string
-    architecture?: string
-    connection_type?: string
-    ip_address?: string
-    battery_level?: number
-    screen_on?: boolean
-    cpu_usage?: number
-    total_storage?: string
-    available_storage?: string
-    ram?: string
-    current_auto?: string
+}
+
+export interface ExecutionStartResponse {
+    execution_id: string
+    status: 'started'
+    device: DeviceDetail
+    script: Script
+}
+
+export interface ExecutionStopResponse {
+    status: 'stopped'
+}
+
+export interface ExecutionStopAllResponse {
+    stopped_count: number
+    errors: string[]
 }
 
 export const api = axios.create({
@@ -93,29 +84,29 @@ api.interceptors.response.use(
 
 // Device API
 export const deviceApi = {
-    getDevices: () => api.get('/devices'),
-    getDevice: (deviceId: string) => api.get(`/devices/${deviceId}`),
-    getDeviceLogs: (deviceId: string, limit?: number) => api.get(`/devices/${deviceId}/logs`, { params: { limit } }),
-    connectDevice: (deviceId: string) => api.post(`/devices/${deviceId}/connect`),
-    disconnectDevice: (deviceId: string) => api.post(`/devices/${deviceId}/disconnect`),
-    refreshDevices: () => api.post('/devices/refresh'),
+    getDevices: () => api.get<DeviceDetail[]>('/devices'),
+    getDevice: (deviceId: string) => api.get<DeviceDetail>(`/devices/${deviceId}`),
+    getDeviceLogs: (deviceId: string, limit?: number) =>
+        api.get<string[]>(`/devices/${deviceId}/logs`, { params: { limit } }),
 }
 
 // Script API
 export const scriptApi = {
-    getScripts: () => api.get('/scripts'),
-    getScript: (scriptId: string) => api.get(`/scripts/${scriptId}`),
+    getScripts: () => api.get<ScriptListResponse>('/scripts'),
+    getScript: (scriptId: string) => api.get<Script>(`/scripts/${scriptId}`),
 }
 
 // Execute API
 export const executeApi = {
     runScript: (scriptId: string, deviceId: string, gameOptions?: GameOptions) =>
-        api.post('/execute/start', {
+        api.post<ExecutionStartResponse>('/execute/start', {
             device_id: deviceId,
             script_id: scriptId,
             game_options: gameOptions || {}
         }),
-    stopScript: (executionId: string) => api.post('/execute/stop', { execution_id: executionId }),
-    stopAllDevices: () => api.post('/execute/stop-all'),
+    stopScript: (executionId: string) =>
+        api.post<ExecutionStopResponse>('/execute/stop', { execution_id: executionId }),
+    stopAllDevices: () =>
+        api.post<ExecutionStopAllResponse>('/execute/stop-all'),
 }
 

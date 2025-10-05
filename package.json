@@ -9,9 +9,17 @@
     "lint": "turbo run lint",
     "format": "turbo run format",
     "test": "turbo run test",
-    "clean": "turbo run clean && rm -rf node_modules .turbo"
+    "clean": "turbo run clean && rm -rf node_modules .turbo",
+    "prod": "pm2 start ecosystem.config.js",
+    "prod:stop": "pm2 stop ecosystem.config.js",
+    "prod:restart": "pm2 restart ecosystem.config.js",
+    "prod:delete": "pm2 delete ecosystem.config.js",
+    "prod:logs": "pm2 logs",
+    "prod:status": "pm2 status",
+    "prod:clear": "pm2 delete all"
   },
   "devDependencies": {
+    "pm2": "^5.4.2",
     "turbo": "^2.3.3"
   },
   "packageManager": "pnpm@9.15.0",

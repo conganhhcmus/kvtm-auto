@@ -19,7 +19,7 @@ class ExecutionManager:
     def running_scripts(self):
         return ExecutionManager._running_scripts
 
-    def start_script(self, device_id, script_id, script_path, game_options=None):
+    def start_script(self, device_id, script_id, script_path, game_options=None, script_name=None):
         device = self.device_manager.get_device(device_id)
         if not device:
             raise ValueError("Device not found")
@@ -50,11 +50,15 @@ class ExecutionManager:
                 text=True,
                 bufsize=1,  # Line buffering
                 universal_newlines=True,
-                cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),  # Set working directory to backend/src
+                cwd=os.path.dirname(
+                    os.path.dirname(os.path.abspath(__file__))
+                ),  # Set working directory to backend/src
             )
 
             device.status = "busy"
             device.current_script = script_id
+            device.current_script_name = script_name
+            device.game_options = game_options_obj.to_dict() if game_options else None
 
             # Add start log
             timestamp = datetime.now().strftime("%H:%M:%S")
@@ -66,6 +70,9 @@ class ExecutionManager:
 
             # Set execution_id on the device for tracking
             device.current_execution_id = running_script.id
+
+            # Save device state after starting script
+            self.device_manager._save_device_states()
 
             # Start log capture thread
             log_thread = threading.Thread(
@@ -97,7 +104,9 @@ class ExecutionManager:
 
             device.status = "available"
             device.current_script = None
+            device.current_script_name = None
             device.current_execution_id = None  # Clear execution_id when stopping
+            device.game_options = None  # Clear game options when stopping
 
             # Add completion log
             timestamp = datetime.now().strftime("%H:%M:%S")
@@ -152,7 +161,9 @@ class ExecutionManager:
             # Clean up device state when script finishes naturally
             device.status = "available"
             device.current_script = None
+            device.current_script_name = None
             device.current_execution_id = None
+            device.game_options = None
 
             timestamp = datetime.now().strftime("%H:%M:%S")
             completion_log = f"[{timestamp}]: Script execution completed"
@@ -160,6 +171,7 @@ class ExecutionManager:
 
             # Save device state after completion
             from libs.device_manager import DeviceManager
+
             device_manager = DeviceManager()
             device_manager._save_device_states()
 
@@ -176,10 +188,13 @@ class ExecutionManager:
             # Clean up device state even on error
             device.status = "available"
             device.current_script = None
+            device.current_script_name = None
             device.current_execution_id = None
+            device.game_options = None
 
             # Save device state after error
             from libs.device_manager import DeviceManager
+
             device_manager = DeviceManager()
             device_manager._save_device_states()
 

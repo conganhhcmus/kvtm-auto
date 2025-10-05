@@ -6,26 +6,6 @@ from libs.storage_manager import StorageManager
 from models.device import Device
 
 
-def get_device_screen_size(serial):
-    """Get device screen size as [width, height]"""
-    try:
-        result = subprocess.run(
-            ["adb", "-s", serial, "shell", "wm", "size"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        # Parse output like "Physical size: 1920x1080"
-        for line in result.stdout.splitlines():
-            if "Physical size:" in line:
-                size_str = line.split("Physical size:")[-1].strip()
-                width, height = map(int, size_str.split("x"))
-                return [width, height]
-        return None
-    except Exception:
-        return None
-
-
 class DeviceManager:
     _instance = None
     _initialized = False
@@ -56,8 +36,9 @@ class DeviceManager:
             )  # Default to offline until discovered
             device.last_seen = state_data.get("last_seen", datetime.now())
             device.current_script = state_data.get("current_script")
+            device.current_script_name = state_data.get("current_script_name")
             device.current_execution_id = state_data.get("current_execution_id")
-            device.screen_size = state_data.get("screen_size")
+            device.game_options = state_data.get("game_options")
             self.devices[serial] = device
 
     def _save_device_states(self):
@@ -69,13 +50,14 @@ class DeviceManager:
         # Stop existing thread if running
         if self._discovery_thread and self._discovery_thread.is_alive():
             self._stop_discovery_flag.set()
-            self._discovery_thread.join(
-                timeout=6
-            )  # Wait max 6 seconds (1 cycle + buffer)
+            # Wait max 6 seconds (1 cycle + buffer)
+            self._discovery_thread.join(timeout=6)
             self._stop_discovery_flag.clear()
 
         def discover():
             while not self._stop_discovery_flag.is_set():
+                changed = False  # Track if any state changed this cycle
+
                 try:
                     result = subprocess.run(
                         ["adb", "devices"], capture_output=True, text=True
@@ -89,36 +71,32 @@ class DeviceManager:
 
                             if serial not in self.devices:
                                 device = Device(serial)
-                                # Fetch screen size if not already cached
-                                if device.screen_size is None:
-                                    device.screen_size = get_device_screen_size(serial)
                                 self.devices[serial] = device
-                                self._save_device_states()  # Save when new device added
+                                changed = True  # New device added
                             else:
                                 self.devices[serial].last_seen = datetime.now()
+                                changed = True  # last_seen updated
+
                                 if self.devices[serial].status == "offline":
                                     self.devices[serial].status = "available"
-                                    self._save_device_states()  # Save when device comes online
-                                # Fetch screen size if not already cached
-                                if self.devices[serial].screen_size is None:
-                                    self.devices[
-                                        serial
-                                    ].screen_size = get_device_screen_size(serial)
-                                    self._save_device_states()  # Save when screen size updated
+                                    # changed already set to True above
 
                     # Mark devices as offline if not found
                     for serial in list(self.devices.keys()):
                         if serial not in current_serials:
                             if self.devices[serial].status != "offline":
                                 self.devices[serial].status = "offline"
-                                self._save_device_states()  # Save when device goes offline
+                                changed = True  # Device went offline
+
+                    # Save once per cycle if anything changed
+                    if changed:
+                        self._save_device_states()
 
                 except Exception as e:
                     print(f"Device discovery error: {e}")
 
-                self._stop_discovery_flag.wait(
-                    5
-                )  # Check every 5 seconds, or exit immediately if flag is set
+                # Check every 5 seconds, or exit immediately if flag is set
+                self._stop_discovery_flag.wait(5)
 
         self._discovery_thread = threading.Thread(target=discover, daemon=True)
         self._discovery_thread.start()

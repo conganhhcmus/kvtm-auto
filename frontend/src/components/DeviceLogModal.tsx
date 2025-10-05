@@ -52,7 +52,7 @@ const DeviceLogModal: React.FC<DeviceLogModalProps> = ({ isOpen, onClose, device
     }
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title={`Device Logs - ${deviceId}`} size="xl">
+        <Modal isOpen={isOpen} onClose={onClose} title={`Device Logs - ${deviceId}`}>
             <div className="space-y-4">
                 {/* Header with controls */}
                 <div className="flex items-center justify-between pb-2 border-b">

@@ -67,8 +67,9 @@ class StorageManager:
                     "status": device.status,
                     "last_seen": device.last_seen.isoformat(),
                     "current_script": device.current_script,
+                    "current_script_name": device.current_script_name,
                     "current_execution_id": device.current_execution_id,
-                    "screen_size": device.screen_size,
+                    "game_options": device.game_options,
                 }
 
             with open(self.state_file, "w", encoding="utf-8") as f:

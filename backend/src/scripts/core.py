@@ -44,7 +44,7 @@ sell_options = [
 ]
 
 
-def _close_all_popup(manager: AdbController, num=10):
+def _close_all_popup(manager: AdbController, num=3):
     for _ in range(num):
         manager.press_key(KeyCode.BACK.value)
         manager.sleep(0.2)
@@ -63,7 +63,7 @@ def open_game(manager: AdbController):
     manager.sleep(10)
     manager.click_image("game")
     manager.sleep(15)
-    _close_all_popup(manager)
+    _close_all_popup(manager, 15)
 
 
 def open_chest(manager: AdbController):
@@ -80,7 +80,7 @@ def open_chest(manager: AdbController):
         for _ in range(10):
             manager.tap_by_percent(50.0, 62.22)
             manager.sleep(0.2)
-        _close_all_popup(manager, 3)
+        _close_all_popup(manager)
     manager.sleep(0.5)
 
 
@@ -132,6 +132,13 @@ def harvest_tree(manager: AdbController):
     manager.tap(*full_tree_point[0])
     manager.sleep(0.5)
     slot = manager.find_image_on_screen("thu-hoach")
+    attempt = 3
+    while not slot and attempt > 0:
+        manager.tap(*full_tree_point[0])
+        manager.sleep(0.5)
+        slot = manager.find_image_on_screen("thu-hoach")
+        attempt -= 1
+
     if not slot:
         raise LookupError("Image not found")
 
@@ -168,7 +175,7 @@ def make_items(manager: AdbController, floor=1, slot=0, num=1):
     manager.sleep(0.1)
     manager.tap(1512, 770)
     manager.sleep(0.1)
-    _close_all_popup(manager, 3)
+    _close_all_popup(manager)
 
 
 def sell_items(manager: AdbController, option: SellOption, items):
@@ -254,12 +261,12 @@ def sell_items(manager: AdbController, option: SellOption, items):
             manager.tap(1200, 85)
             manager.sleep(0.5)
 
-            _close_all_popup(manager, 3)
+            _close_all_popup(manager)
             _roll_back_item(items, item)
             # recurse for remain items
             return sell_items(manager, option, items)
 
-    _close_all_popup(manager, 3)
+    _close_all_popup(manager)
 
 
 def _sell(manager: AdbController, setAds=True):

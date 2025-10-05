@@ -93,7 +93,7 @@ def main():
 
         i += 1
 
-    print("Vai xanh la automation completed")
+    print("Trong cay su kien automation completed")
 
 
 if __name__ == "__main__":

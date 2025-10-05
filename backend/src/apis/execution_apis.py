@@ -34,7 +34,7 @@ def start_script():
 
     try:
         running_script = execution_manager.start_script(
-            device_id, script_id, script.path, game_options
+            device_id, script_id, script.path, game_options, script.name
         )
         return (
             jsonify(

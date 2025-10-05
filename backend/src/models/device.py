@@ -19,10 +19,9 @@ class Device:
         self.status = "available"  # available, busy, offline
         self.last_seen = datetime.now()
         self.current_script = None
-        self.current_execution_id = (
-            None  # Track current execution ID for running scripts
-        )
-        self.screen_size = None  # [width, height] - will be populated during discovery
+        self.current_script_name = None  # Track display name of current script
+        self.current_execution_id = None  # Track current execution ID for running scripts
+        self.game_options = None  # Track game options for current execution
         self._storage = StorageManager()
 
     def add_log(self, log_entry):
@@ -44,6 +43,7 @@ class Device:
             "status": self.status,
             "last_seen": self.last_seen.isoformat(),
             "current_script": self.current_script,
+            "current_script_name": self.current_script_name,
             "current_execution_id": self.current_execution_id,
-            "screen_size": self.screen_size,
+            "game_options": self.game_options,
         }

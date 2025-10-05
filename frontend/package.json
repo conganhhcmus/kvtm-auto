@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "prod": "serve -s dist -p 3000",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "format": "eslint . --ext ts,tsx --fix",
     "preview": "vite preview",
@@ -29,6 +30,7 @@
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.3.4",
     "postcss": "^8.4.21",
+    "serve": "^14.2.3",
     "tailwindcss": "^3.3.0",
     "typescript": "^5.0.2",
     "vite": "^7.1.2"
