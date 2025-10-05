@@ -1,400 +1,440 @@
-# KVTM Auto - Android Device Automation Platform
+# KVTM Auto
 
-A comprehensive full-stack application for automating Android devices using ADB (Android Debug Bridge). Built with a modern React + TypeScript frontend and Python FastAPI backend with advanced Android automation capabilities.
-
-**Recently refactored** for simplicity, maintainability, and better user experience with 50% code reduction and enhanced logging.
+**KVTM Auto** is a full-stack Android device automation platform designed for automating mobile games and applications via ADB (Android Debug Bridge). Built with a modern monorepo architecture, it provides a web-based interface for managing multiple devices, executing automation scripts, and monitoring real-time logs.
 
 ## Features
 
-### 🤖 Device Management
-- Automatic device discovery via ADB
-- Real-time device status monitoring  
-- USB device support with privileged Docker access
-- Device connection/disconnection management
-- Device details and specifications display
+- **Multi-Device Management**: Connect and control multiple Android devices simultaneously
+- **Web-Based UI**: Modern Next.js interface for managing devices and scripts
+- **Real-Time Logging**: Live log streaming from running automation scripts
+- **Image Recognition**: OpenCV-based template matching for visual automation
+- **OCR Support**: Text recognition and interaction using Tesseract
+- **Script Library**: Extensible script system with shared utilities
+- **Process Isolation**: Scripts run as separate processes for stability
+- **Auto-Discovery**: Automatic detection and registration of connected devices
 
-### 📝 Script Management - **SIMPLIFIED**
-- Custom automation script execution with metadata
-- **Subprocess-only execution** (no threading complexity)
-- Real-time progress tracking with **clean log format**
-- Script execution history and status
-- Enhanced shell command building with loop support
+## Tech Stack
 
-### 📊 Logging & Monitoring - **ENHANCED**
-- **New Simple Log Format**: `[12:34:56 PM]: Run Script [1000] times`
-- Device-specific log filtering
-- Real-time log streaming
-- User-friendly action-based logging
-- Health check endpoints
+### Backend
+- **Python 3.9+** with Poetry
+- **Flask** - REST API server
+- **OpenCV** - Image recognition and matching
+- **Tesseract OCR** - Text detection
+- **ADB** - Android device control
 
-### 🎛️ Web Interface
-- Modern React-based UI with Vite and Tailwind CSS
-- Real-time updates with TanStack Query v4
-- Responsive device management dashboard
-- Interactive script execution controls
-- **Enhanced log display** with clean time format
-- Mobile-responsive design
-- Clean blue gradient interface
+### Frontend
+- **Next.js 14** - React framework with App Router
+- **React 18** - UI library
+- **TypeScript** - Type-safe development
+- **TanStack Query** - Data fetching and caching
+- **Tailwind CSS** - Utility-first styling
+- **Axios** - HTTP client
 
-### 🔧 Technology Stack - **UPDATED**
-- **Backend**: FastAPI 0.104.1, Python 3.9+, **Simplified Architecture**
-- **Frontend**: React 18.2, TypeScript 5+, Vite 7.1.2, Tailwind CSS 3.3
-- **Containerization**: Docker with privileged mode for USB device access
-- **Image Processing**: OpenCV, NumPy for device screenshots
-- **Shell Utilities**: **NEW - Enhanced command building with Shell class**
-- **Logging**: **NEW - Simple [Time]: [Action] [Index] format**
-- **Models**: **NEW - Unified API models in single location**
+### Infrastructure
+- **Turborepo** - Monorepo build system
+- **pnpm** - Fast, disk-efficient package manager
+- **PM2** - Production process manager
 
-## Architecture - **REFACTORED**
+## Prerequisites
 
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Frontend      │    │    Backend      │    │   Android       │
-│   (React)       │◄──►│   (FastAPI)     │◄──►│   Devices       │
-│   Vite Dev      │    │   Simplified    │    │   (ADB)         │
-│   or Docker     │    │   Subprocess    │    │                 │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-```
+Before you begin, ensure you have the following installed:
 
-### **Recent Refactoring Benefits**
-- **50% less code** - Simplified executor, APIs, and error handling
-- **Subprocess-only execution** - Better isolation, simpler debugging
-- **Clean logging** - `[12:34:56 PM]: Run Open Game` format
-- **Unified models** - All API models centralized
-- **Enhanced shell support** - Programmatic command building
-- **Global error handling** - Consistent across all endpoints
+- **Node.js** >= 18.0.0
+- **pnpm** >= 9.0.0
+- **Python** >= 3.9
+- **Poetry** - Python dependency management
+- **ADB (Android Debug Bridge)** - Included with Android SDK Platform Tools
+- **Android Device/Emulator** - With USB debugging enabled
 
-## Quick Start
+### ADB Setup
 
-### Prerequisites
-- Docker and Docker Compose (for containerized deployment)
-- **OR** Python 3.9+ and Node.js 16+ (for local development)
-- Android SDK platform tools (ADB) 
-- USB debugging enabled on Android devices
+1. Download [Android SDK Platform Tools](https://developer.android.com/studio/releases/platform-tools)
+2. Add ADB to your system PATH
+3. Verify installation: `adb version`
+4. Enable USB debugging on your Android device:
+   - Settings → About Phone → Tap "Build Number" 7 times
+   - Settings → Developer Options → Enable "USB Debugging"
 
-### Option 1: Docker Deployment (Recommended for Production)
+## Installation
 
-1. Clone the repository:
+### 1. Clone the Repository
+
 ```bash
 git clone <repository-url>
 cd kvtm-auto
 ```
 
-2. **Important**: Ensure ADB is installed on your host system and USB debugging is enabled on your Android devices.
+### 2. Install Dependencies
 
-3. Start the application:
 ```bash
-docker-compose up -d
-```
+# Install all packages (frontend + backend)
+pnpm install
 
-4. Access the application:
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:8000
-- **API Documentation**: http://localhost:8000/docs
-- **Health Check**: http://localhost:8000/health
-
-### Option 2: Local Development (Recommended for Development)
-
-1. Clone and setup backend:
-```bash
-cd kvtm-auto/backend
+# Install backend dependencies
+cd backend
 poetry install
-poetry run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+cd ..
 ```
 
-2. Setup frontend (in new terminal):
+### 3. Verify Device Connection
+
 ```bash
-cd kvtm-auto/frontend  
-npm install
-npm run dev  # Starts on localhost:5173
+# Check connected devices
+adb devices
+
+# Expected output:
+# List of devices attached
+# emulator-5554   device
 ```
 
-3. Access the application:
-- **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:8000
-- **API Documentation**: http://localhost:8000/docs
+## Quick Start
+
+### Development Mode
+
+Run both frontend and backend in development mode:
+
+```bash
+# From project root
+pnpm dev
+```
+
+This will start:
+- **Backend**: `http://localhost:3001` (Flask with auto-reload)
+- **Frontend**: `http://localhost:3000` (Next.js dev server)
+
+The frontend automatically proxies `/api` requests to the backend.
+
+### Production Mode
+
+```bash
+# Build all packages
+pnpm build
+
+# Start with PM2
+pnpm prod
+
+# View logs
+pnpm prod:logs
+
+# Stop services
+pnpm prod:stop
+```
+
+### Access the Application
+
+Open your browser and navigate to:
+```
+http://localhost:3000
+```
+
+You should see:
+- Connected devices listed
+- Available automation scripts
+- Control panel for execution
+
+## Project Structure
+
+```
+kvtm-auto/
+├── backend/                    # Python Flask backend
+│   ├── src/
+│   │   ├── main.py            # Flask app entry point
+│   │   ├── apis/              # API route blueprints
+│   │   ├── libs/              # Core libraries (managers, controllers)
+│   │   ├── models/            # Data models
+│   │   ├── scripts/           # Automation scripts
+│   │   ├── assets/            # Image templates for matching
+│   │   └── data/              # Runtime data (logs, state)
+│   └── pyproject.toml         # Poetry dependencies
+├── frontend/                   # Next.js frontend
+│   ├── src/
+│   │   ├── app/               # Next.js App Router pages
+│   │   ├── components/        # React components
+│   │   └── api.ts             # API client
+│   └── package.json
+├── turbo.json                 # Turborepo configuration
+├── package.json               # Root package with scripts
+└── CLAUDE.md                  # Detailed technical documentation
+```
 
 ## Usage
 
-### Device Management
-1. Connect Android devices via USB
-2. Enable USB debugging in developer options
-3. Devices automatically appear in the web interface
-4. Use the interface to manage device connections
+### Managing Devices
 
-### Script Execution - **ENHANCED**
-1. Place Python scripts in `backend/scripts/` directory
-2. Scripts automatically appear in the web interface
-3. Select target devices and run scripts
-4. **Monitor progress with clean logs**: `[12:34:56 PM]: Run Script [1000] times`
+The application automatically discovers connected Android devices. Device status includes:
+- **Available**: Ready to run scripts
+- **Busy**: Currently running a script
+- **Offline**: Disconnected
 
-### Writing Custom Scripts - **SIMPLIFIED**
+### Running Scripts
 
-Create a Python file in `backend/scripts/` with the new simple logging:
+1. Select one or more devices from the UI
+2. Choose an automation script from the dropdown
+3. Configure script options (if available):
+   - Open Game
+   - Open Chest
+   - Sell Items
+4. Click "Start" to begin execution
+5. View real-time logs in the device panel
+
+### Viewing Logs
+
+- **Real-time logs**: Automatically stream during script execution
+- **Log history**: Persisted to `backend/src/data/logs/<device_serial>.log`
+- **Clear logs**: Use the "Clear Logs" button in device details
+
+## Writing Custom Scripts
+
+### Basic Script Template
+
+Create a new file in `backend/src/scripts/`:
 
 ```python
-from scripts._core import write_log, log_run_open_game, log_run_script, log_loop_iteration
+import json
+import sys
+import os
 
-# Script metadata - required for script discovery
-SCRIPT_META = {
-    "id": "my_script",
-    "name": "My Custom Script",
-    "order": 1,
-    "marked": True,
-    "description": "Description of what this script does"
-}
+# Add backend/src to path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-def main(device: Device, game_options: GameOptions, context):
-    """
-    Main script function for CLI execution with new simple logging
-    
-    Logs will appear as:
-    [12:34:56 PM]: Run Open Game
-    [12:34:57 PM]: Run Script [1000] times
-    [12:34:58 PM]: Loop [1/1000]
-    """
-    
-    # Use simple logging functions
-    log_run_open_game(device.id)
-    log_run_script(device.id, 1000)
-    
-    # Custom actions with clean format
-    write_log(device.id, "Taking screenshot")
-    write_log(device.id, "Waiting", "5.0s")  # [12:34:58 PM]: Waiting [5.0s]
-    
-    # Loop with progress tracking
-    for i in range(1000):
-        log_loop_iteration(device.id, i+1, 1000)  # [12:35:01 PM]: Loop [1/1000]
-        
-        # Your automation logic here
-        # No complex try-catch needed - global handler will catch errors
-        
-    return {"status": "success", "message": "Completed"}
+from libs.adb_controller import AdbController
+from models.game_options import GameOptions
+from scripts.core import open_game, plant_tree, harvest_tree
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python script.py <device_id> [game_options_json]")
+        sys.exit(1)
+
+    device_id = sys.argv[1]
+    game_options = GameOptions()
+
+    # Parse game options
+    if len(sys.argv) > 2:
+        try:
+            options_dict = json.loads(sys.argv[2])
+            game_options = GameOptions.from_dict(options_dict)
+        except json.JSONDecodeError:
+            print("Error: Invalid JSON format for game_options")
+            sys.exit(1)
+
+    # Initialize ADB controller
+    manager = AdbController(device_id)
+
+    # Open game if requested
+    if game_options.open_game:
+        open_game(manager)
+
+    # Your automation logic
+    for i in range(10):
+        print(f"Loop {i}: Planting trees...")
+        plant_tree(manager, "tree-type")
+        manager.sleep(3)
+
+        print(f"Loop {i}: Harvesting...")
+        harvest_tree(manager)
+
+    print("Script completed successfully!")
+
+if __name__ == "__main__":
+    main()
 ```
 
-### **New Logging Format Examples**
-Your logs will now display cleanly:
+### Available Utilities (scripts/core.py)
+
+The `core.py` module provides shared automation functions:
+
+**Game Management**:
+- `open_game(manager)` - Launch game and handle popups
+- `open_chest(manager)` - Open available chests
+- `go_up(manager, times=1)` - Navigate upward
+- `go_down(manager, times=1)` - Navigate downward
+
+**Farming**:
+- `plant_tree(manager, tree=None, num=12)` - Plant trees in grid
+- `harvest_tree(manager)` - Harvest all trees
+- `make_items(manager, floor=1, slot=0, num=1)` - Craft items
+
+**Market**:
+- `sell_items(manager, option, items)` - Sell items at market
+
+**ADB Controller Methods**:
+- `tap(x, y)` - Tap at coordinates
+- `swipe(x1, y1, x2, y2, duration)` - Swipe gesture
+- `find_image_on_screen(template_path, threshold=0.9)` - Find image
+- `click_image(template_path)` - Find and click image
+- `click_text(text, lang="eng")` - OCR-based text clicking
+
+### Script Discovery
+
+Scripts are automatically discovered from `backend/src/scripts/`:
+- Filename: `my_script.py` → Script ID: `my_script`
+- Display name is auto-generated (title-cased)
+- Files matching patterns in `.ignore` are excluded
+
+### Testing Scripts
+
+**Direct execution** (faster iteration):
+```bash
+cd backend
+poetry run python src/scripts/my_script.py emulator-5554 '{"open_game":true}'
 ```
-[12:12:39 PM]: Run Open Game
-[12:14:23 PM]: Run Script [1000] times  
-[12:14:25 PM]: Script started [my_script]
-[12:15:45 PM]: Loop [1/1000]
-[12:15:47 PM]: Waiting [1.0]s
-[12:15:48 PM]: Loop [2/1000]
-[12:22:15 PM]: Script completed
+
+**Via API** (full integration):
+```bash
+curl -X POST http://localhost:3001/api/execute/start \
+  -H "Content-Type: application/json" \
+  -d '{
+    "device_id": "emulator-5554",
+    "script_id": "my_script",
+    "game_options": {"open_game": true}
+  }'
 ```
-
-## API Documentation - **SIMPLIFIED**
-
-The backend provides a RESTful API with simplified endpoints:
-
-### Devices
-- `GET /api/devices` - List all devices
-- `GET /api/devices/{device_id}` - Get device details  
-- `GET /api/devices/{device_id}/logs` - Get device logs (new format)
-
-### Scripts
-- `GET /api/scripts` - List available scripts
-- `GET /api/scripts/{script_id}` - Get script details
-
-### Script Execution - **STREAMLINED**
-- `POST /api/execute/start` - Start script execution
-- `POST /api/execute/stop` - Stop script on device
-- `POST /api/execute/stop-all` - Stop all running scripts
-
-### System
-- `GET /health` - Health check endpoint
 
 ## Development
 
-### Project Structure - **UPDATED**
-```
-kvtm-auto/
-├── frontend/                    # React TypeScript frontend
-│   ├── src/
-│   │   ├── components/         # React components
-│   │   │   ├── DeviceDetailModal.tsx
-│   │   │   ├── DeviceLogModal.tsx    # NEW - Simple log display
-│   │   │   ├── Modal.tsx
-│   │   │   ├── MultiSelect.tsx
-│   │   │   └── SearchableSelect.tsx
-│   │   ├── api.ts              # API client
-│   │   ├── App.tsx             # Main application
-│   │   └── main.tsx            # Entry point
-│   └── package.json            # Dependencies
-├── backend/                     # Python FastAPI backend - REFACTORED
-│   ├── src/
-│   │   ├── api/               # API routes - SIMPLIFIED
-│   │   │   ├── devices.py     # Unified models, no complex try-catch
-│   │   │   ├── scripts.py     # No validation, simple endpoints
-│   │   │   └── execute.py     # Streamlined execution API
-│   │   ├── service/           # Service layer - STREAMLINED  
-│   │   │   ├── executor.py    # Subprocess-only (450→150 lines)
-│   │   │   ├── database.py    # Simple log format storage
-│   │   │   └── script.py      # Script management
-│   │   ├── libs/              # Core utilities - ENHANCED
-│   │   │   ├── adb.py         # Android Debug Bridge wrapper
-│   │   │   ├── shell.py       # NEW - Shell command utilities
-│   │   │   ├── time_provider.py # Enhanced time utilities
-│   │   │   ├── log_actions.py  # NEW - Standard log constants
-│   │   │   └── image.py       # Image processing
-│   │   ├── models/            # Data models - UNIFIED
-│   │   │   ├── device.py      # Device models
-│   │   │   ├── script.py      # Script models  
-│   │   │   └── api.py         # NEW - All API models centralized
-│   │   ├── scripts/           # Automation scripts
-│   │   │   ├── _core.py       # ENHANCED - Simple logging utilities
-│   │   │   ├── example_script.py
-│   │   │   └── open_game.py
-│   │   ├── data/              # JSON storage (moved under src/)
-│   │   ├── logs/              # Log files (moved under src/)
-│   │   └── main.py            # FastAPI entry point
-│   └── pyproject.toml         # Poetry configuration
-├── docker-compose.yml          # Container orchestration  
-├── CLAUDE.md                   # Development guidance (UPDATED)
-└── README.md                   # Project documentation (THIS FILE)
+### Available Commands
+
+**Monorepo** (from root):
+```bash
+pnpm dev          # Run all services in development
+pnpm build        # Build all packages
+pnpm lint         # Lint all packages
+pnpm format       # Format all packages
+pnpm clean        # Clean build artifacts
 ```
 
-### Code Quality & Development Commands
+**Backend** (from `backend/`):
+```bash
+poetry run python src/main.py --env dev     # Dev server
+poetry run python src/main.py --env prod    # Production server
+poetry run black src/                       # Format code
+poetry run isort src/                       # Sort imports
+poetry run flake8 src/                      # Lint
+poetry run mypy src/                        # Type checking
+poetry run pytest                           # Run tests
+```
+
+**Frontend** (from `frontend/`):
+```bash
+npm run dev       # Next.js dev server
+npm run build     # Build for production
+npm start         # Start production server
+npm run lint      # ESLint
+npm run format    # Fix linting issues
+```
+
+### Code Quality
+
+The project includes automated code quality tools:
+
+**Python**:
+- **Black** - Code formatter (88 char line length)
+- **isort** - Import sorting
+- **Flake8** - Linting
+- **mypy** - Type checking
+- **pytest** - Testing framework
+
+**TypeScript**:
+- **ESLint** - Linting
+- **TypeScript** - Type checking
+- **Prettier** - Code formatting (via ESLint)
+
+## API Documentation
+
+### Endpoints Overview
+
+**Devices**:
+- `GET /api/devices` - List all devices
+- `GET /api/devices/{device_id}` - Get device details
+- `GET /api/devices/{device_id}/logs` - Get device logs
+
+**Scripts**:
+- `GET /api/scripts` - List available scripts
+
+**Execution**:
+- `POST /api/execute/start` - Start script on device
+- `POST /api/execute/stop` - Stop specific execution
+- `POST /api/execute/stop-all` - Stop all running scripts
+
+**System**:
+- `GET /health` - Health check
+
+For detailed API documentation, see [CLAUDE.md](./CLAUDE.md).
+
+## Production Deployment
+
+The project uses PM2 for production process management:
 
 ```bash
-# Local Backend Development
-cd backend
-poetry install
-poetry run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
-poetry run black src/              # Format code
-poetry run isort src/              # Sort imports  
-poetry run flake8 src/             # Lint code
-poetry run mypy src/               # Type checking
-poetry run pytest                 # Run tests
+# Start services
+pnpm prod
 
-# Local Frontend Development  
-cd frontend
-npm install
-npm run dev                        # Start dev server (localhost:5173)
-npm run build                      # Build for production
-npm run lint                       # ESLint check
-npm run format                     # Fix linting issues
+# View status
+pnpm prod:status
 
-# Docker Development
-docker-compose up -d               # Start all services
-docker-compose down                # Stop services
-docker-compose build               # Rebuild after changes
-docker-compose logs backend        # View backend logs
-docker-compose logs frontend       # View frontend logs
+# View logs
+pnpm prod:logs
+
+# Restart services
+pnpm prod:restart
+
+# Stop services
+pnpm prod:stop
 ```
 
-### **New Architecture Benefits**
-
-#### **For Developers**
-- **50% less code** to maintain and debug
-- **Simplified APIs** - no complex validation or try-catch blocks
-- **Unified models** - single source of truth for API contracts
-- **Enhanced shell support** - programmatic command building
-- **Global error handling** - consistent responses
-
-#### **For Users** 
-- **Clean log format** - easy to read `[Time]: [Action] [Index]`
-- **Better reliability** - subprocess isolation
-- **Faster development** - simplified architecture
-- **Consistent experience** - unified error handling
-
-## Configuration
-
-### Environment Variables
-
-#### Backend
-- `LOG_LEVEL` - Logging level (DEBUG, INFO, WARNING, ERROR)
-- `PYTHONPATH` - Python module path
-
-#### Frontend  
-- `VITE_API_URL` - Backend API URL
-  - Local: `http://localhost:8000/api`
-  - Docker: `http://localhost:8000/api`
-
-### Deployment Options
-
-| Environment | Backend | Frontend | Use Case |
-|------------|---------|----------|----------|
-| **Local Dev** | localhost:8000 | localhost:5173 | Fast development |
-| **Docker** | localhost:8000 | localhost:3000 | Production-like testing |
+PM2 configuration is defined in `ecosystem.config.js`.
 
 ## Troubleshooting
 
-### Common Issues
+### Devices Not Detected
 
-**Devices not appearing**
-- Ensure USB debugging is enabled
-- Check ADB driver installation  
-- Verify device authorization in ADB
+1. Verify ADB connection: `adb devices`
+2. Check USB debugging is enabled on device
+3. Restart ADB server: `adb kill-server && adb start-server`
+4. Check backend logs for discovery errors
 
-**Permission denied errors**
-- Enable USB debugging on devices
-- Run Docker with privileged mode (configured)
-- Add user to `plugdev` group on Linux
+### Script Execution Fails
 
-**Script execution failures**
-- Check device connectivity with `adb devices`
-- Review execution logs (now in clean format)
-- Verify script syntax
+1. Ensure device status is "available" (not busy or offline)
+2. Check script syntax and imports
+3. View device logs for error details
+4. Test script directly: `poetry run python src/scripts/<script>.py <device_id>`
 
-**Logs not displaying correctly**
-- Check if using new logging format: `write_log(device_id, "Action", "index")`
-- Old format logs may not display properly
-- Update scripts to use `_core.py` logging utilities
+### Image Matching Fails
 
-### **Development Tips**
-
-**Local Development**
-- Use `poetry run uvicorn src.main:app --reload` for hot reload
-- Use `npm run dev` for frontend hot reload
-- Logs appear in terminal and database
-
-**Docker Development**  
-- Use `docker-compose logs -f backend` for live log monitoring
-- Rebuild containers after code changes: `docker-compose build`
-- Access logs via API: `GET /api/devices/{device_id}/logs`
-
-**Script Development**
-- Use new simple logging: `log_run_script(device_id, 1000)`
-- Avoid complex try-catch - let global handler manage errors
-- Test with local development for faster iteration
+1. Verify template exists in `backend/src/assets/`
+2. Check screen resolution matches template expectations
+3. Lower threshold parameter (default 0.9) for more lenient matching
+4. Use `find_image_on_screen()` to debug matching
 
 ## Contributing
 
+Contributions are welcome! Please follow these guidelines:
+
 1. Fork the repository
-2. Create a feature branch
-3. Use the new simplified architecture patterns
-4. Add tests for new functionality
-5. Use the simple logging format for user-facing logs
-6. Ensure all tests pass
-7. Submit a pull request
+2. Create a feature branch: `git checkout -b feature/my-feature`
+3. Follow code style guidelines (Black, ESLint)
+4. Write tests for new functionality
+5. Commit with conventional commits: `feat:`, `fix:`, `refactor:`, etc.
+6. Submit a pull request
 
-## Recent Changes (v2.0)
+## Documentation
 
-### **Architecture Refactoring**
-- ✅ **Simplified Executor** - 450 lines → 150 lines (subprocess-only)
-- ✅ **Streamlined APIs** - 50% code reduction across all endpoints  
-- ✅ **Unified Models** - All API models centralized in `models/api.py`
-- ✅ **Enhanced Shell Support** - `Shell` class with loop command building
-- ✅ **Simple Logging** - `[Time]: [Action] [Index]` format
-- ✅ **Global Error Handling** - Consistent error responses
-- ✅ **Directory Restructure** - Data/logs moved under `src/`
-
-### **Benefits**
-- **Maintainability**: 50% less code to maintain
-- **Reliability**: Better process isolation with subprocess-only approach
-- **User Experience**: Clean, readable logs  
-- **Developer Experience**: Simplified APIs, unified models
-- **Performance**: Removed unnecessary complexity
+- **CLAUDE.md** - Detailed technical documentation for developers
+- **README.md** - This file (quick start and overview)
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+[Add your license here]
 
 ## Support
 
-- **Documentation**: Check CLAUDE.md for development guidance
-- **API Docs**: http://localhost:8000/docs (when backend is running)
-- **Issues**: Use GitHub issue tracker  
-- **Architecture**: See refactoring notes in CLAUDE.md
+For issues and questions:
+- Create an issue in the repository
+- Check existing documentation in CLAUDE.md
+- Review script examples in `backend/src/scripts/`
+
+---
+
+**Built with ❤️ for Android automation**

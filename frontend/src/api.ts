@@ -1,6 +1,8 @@
 import axios from 'axios'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
+// In Next.js, use '/api' for client-side requests (proxied by next.config.js rewrites)
+// The proxy rewrites '/api/*' to 'http://localhost:3001/api/*'
+const API_BASE_URL = '/api'
 
 export interface GameOptions {
     open_game?: boolean

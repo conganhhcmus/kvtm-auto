@@ -6,10 +6,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **KVTM Auto** is a full-stack Android device automation platform for automating mobile games via ADB (Android Debug Bridge). The system uses:
 - **Backend**: Flask (Python 3.9+) on port 3001
-- **Frontend**: React 18 + TypeScript + Vite on port 3000 (proxies `/api` to backend)
+- **Frontend**: Next.js 14 + React 18 + TypeScript on port 3000 (proxies `/api` to backend)
+- **Monorepo**: Turborepo with pnpm workspace management
 - **Core Technology**: ADB for device control, OpenCV for image matching, subprocess for script execution
 
 ## Development Commands
+
+### Monorepo Commands (Root)
+```bash
+pnpm install                                      # Install all dependencies
+pnpm dev                                          # Run both frontend & backend (Turborepo)
+pnpm build                                        # Build all packages
+pnpm lint                                         # Lint all packages
+pnpm clean                                        # Clean all build artifacts
+```
 
 ### Backend Development
 ```bash
@@ -30,12 +40,15 @@ poetry run pytest                                # Run tests
 ```bash
 cd frontend
 npm install                                       # Install dependencies
-npm run dev                                       # Dev server (port 3000)
+npm run dev                                       # Next.js dev server (port 3000)
 npm run build                                     # Build for production
+npm start                                         # Start production server
 npm run lint                                      # ESLint check
+npm run format                                    # Fix linting issues
+npm run clean                                     # Clean build artifacts
 ```
 
-**Important**: Frontend proxies `/api` requests to `http://localhost:3001` (configured in `vite.config.ts`)
+**Important**: Frontend uses Next.js and proxies `/api` requests to `http://localhost:3001` via `next.config.js` rewrites. Backend URL can be configured with `NEXT_PUBLIC_BACKEND_URL` env variable.
 
 ## Architecture
 
@@ -76,23 +89,28 @@ backend/src/
 3. **Background Threads**: Device discovery runs continuously, log capture runs per-execution
 4. **File-based Storage**: Device state saved to JSON, logs saved to individual files per device
 
-### Frontend Structure (React + TypeScript)
+### Frontend Structure (Next.js + React + TypeScript)
 
 ```
 frontend/src/
-├── App.tsx                    # Main application component
-├── api.ts                     # API client (axios)
+├── app/
+│   ├── page.tsx              # Main page (home)
+│   ├── layout.tsx            # Root layout with metadata
+│   └── globals.css           # Global styles
 ├── components/
 │   ├── DeviceDetailModal.tsx # Device details view
 │   ├── DeviceLogModal.tsx    # Real-time logs display
 │   ├── Modal.tsx             # Base modal component
 │   ├── MultiSelect.tsx       # Device multi-select
 │   └── SearchableSelect.tsx  # Script selector
+└── api.ts                     # API client (axios)
 ```
 
-- Uses **TanStack Query v4** for data fetching and caching
-- State managed via React hooks
+- Uses **Next.js 14** (App Router)
+- **TanStack Query v4** for data fetching and caching
+- State managed via React hooks and localStorage
 - Tailwind CSS for styling
+- API rewrites configured in `next.config.js`
 
 ## Core System Flows
 
@@ -142,7 +160,6 @@ SERIAL_NAME_MAP = {
 
 **Basic Commands**:
 - `tap(x, y)` - Tap at coordinates
-- `tap_by_percent(percent_x, percent_y)` - Tap at percentage of screen
 - `swipe(x1, y1, x2, y2, duration)` - Swipe gesture
 - `press_key(keycode)` - Press Android key (HOME, BACK, etc.)
 - `open_app(package_name)` / `close_app(package_name)` - App control
@@ -370,11 +387,11 @@ curl -X POST http://localhost:3001/api/execute/start \
 3. **Image Matching**: Max 3 retries with 0.5s delay - adjust `max_retries` parameter
 4. **File Locks**: StorageManager uses threading.Lock for thread-safe file operations
 
-## Recent Changes
+## Important Notes
 
-The README mentions a v2.0 refactoring that was planned but **NOT YET IMPLEMENTED**. Current implementation uses:
-- Flask (not FastAPI as mentioned in README)
-- Threading for log capture (README mentions subprocess-only)
-- No unified API models or simplified logging format yet
+### UI State Persistence
 
-**Current State**: Flask-based backend with standard Python logging, threading for execution management.
+The frontend persists UI state to localStorage:
+- **Control Panel Expansion**: Saves Hide/Show state of control panel
+- Key: `'controlPanelExpanded'`
+- Implementation: `useState` initializer + `useEffect` hook in `app/page.tsx`

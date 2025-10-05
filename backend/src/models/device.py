@@ -20,7 +20,9 @@ class Device:
         self.last_seen = datetime.now()
         self.current_script = None
         self.current_script_name = None  # Track display name of current script
-        self.current_execution_id = None  # Track current execution ID for running scripts
+        self.current_execution_id = (
+            None  # Track current execution ID for running scripts
+        )
         self.game_options = None  # Track game options for current execution
         self._storage = StorageManager()
 

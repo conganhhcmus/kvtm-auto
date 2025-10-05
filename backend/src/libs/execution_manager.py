@@ -19,7 +19,9 @@ class ExecutionManager:
     def running_scripts(self):
         return ExecutionManager._running_scripts
 
-    def start_script(self, device_id, script_id, script_path, game_options=None, script_name=None):
+    def start_script(
+        self, device_id, script_id, script_path, game_options=None, script_name=None
+    ):
         device = self.device_manager.get_device(device_id)
         if not device:
             raise ValueError("Device not found")

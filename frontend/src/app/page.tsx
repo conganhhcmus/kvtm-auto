@@ -1,5 +1,7 @@
-import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+'use client'
+
+import { useState, useEffect } from 'react'
+import { QueryClient, QueryClientProvider, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { deviceApi, scriptApi, executeApi, GameOptions, Script } from '@/api'
 import { Play, Square, ChevronDown, ChevronUp, MonitorOff, ScrollText, Info, Monitor } from 'lucide-react'
 import DeviceDetailModal from '@/components/DeviceDetailModal'
@@ -16,20 +18,42 @@ interface Device {
     current_execution_id: string | null
 }
 
-function App() {
+const queryClient = new QueryClient({
+    defaultOptions: {
+        queries: {
+            retry: 1,
+            staleTime: 5 * 60 * 1000, // 5 minutes
+        },
+    },
+})
+
+function HomePage() {
     const queryClient = useQueryClient()
     const [selectedDevices, setSelectedDevices] = useState<string[]>([])
     const [selectedScript, setSelectedScript] = useState('')
     const [openGame, setOpenGame] = useState(true)
     const [openChests, setOpenChests] = useState(true)
     const [sellItems, setSellItems] = useState(true)
-    
+
     const [showDetailModal, setShowDetailModal] = useState(false)
     const [selectedDeviceDetail, setSelectedDeviceDetail] = useState('')
     const [showLogModal, setShowLogModal] = useState(false)
     const [selectedDeviceForLogs, setSelectedDeviceForLogs] = useState('')
     const [isControlPanelExpanded, setIsControlPanelExpanded] = useState(true)
     const [stoppingDevices, setStoppingDevices] = useState<Set<string>>(new Set())
+
+    // Load control panel state from localStorage after hydration
+    useEffect(() => {
+        const saved = localStorage.getItem('controlPanelExpanded')
+        if (saved !== null) {
+            setIsControlPanelExpanded(JSON.parse(saved))
+        }
+    }, [])
+
+    // Save control panel state to localStorage whenever it changes
+    useEffect(() => {
+        localStorage.setItem('controlPanelExpanded', JSON.stringify(isControlPanelExpanded))
+    }, [isControlPanelExpanded])
 
     const { data: devices = [] } = useQuery({
         queryKey: ['devices'],
@@ -224,7 +248,7 @@ function App() {
                 <div className="relative z-10 bg-white rounded-xl shadow-2xl p-6 sm:p-8 mb-8 backdrop-blur-sm bg-opacity-95">
                     <div className="flex items-center justify-between mb-6">
                         <h2 className="text-lg sm:text-xl font-bold text-gray-900">Control Panel</h2>
-                        <button 
+                        <button
                             onClick={() => setIsControlPanelExpanded(!isControlPanelExpanded)}
                             className="lg:hidden inline-flex items-center px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
                         >
@@ -241,7 +265,7 @@ function App() {
                             )}
                         </button>
                     </div>
-                    
+
                     {/* Collapsible content on mobile, always visible on desktop */}
                     <div className={isControlPanelExpanded ? 'block transition-all duration-300' : 'hidden lg:block transition-all duration-300'}>
                         {/* Device and Script Selection - Same line on desktop */}
@@ -296,7 +320,7 @@ function App() {
                                     </label>
                                 </div>
                             </div>
-                            
+
                             <div className="lg:col-span-1 flex justify-center lg:justify-end">
                                 <button
                                     onClick={handleRunNow}
@@ -358,7 +382,7 @@ function App() {
                                                 <span className="text-sm text-green-700 font-medium">Running</span>
                                             </div>
                                         </div>
-                                        
+
                                         {/* Action buttons - Responsive: 1x5 mobile, 3x2 tablet, 5x1 desktop */}
                                         <div className="flex flex-col gap-2 sm:grid sm:grid-cols-3 sm:gap-2 lg:flex lg:flex-row lg:space-x-2">
                                             <button
@@ -385,14 +409,14 @@ function App() {
                                                 <Monitor className="w-4 h-4 mr-1" />
                                                 View
                                             </button>
-                                            <button 
+                                            <button
                                                 onClick={() => handleViewLogs(device.id)}
                                                 className="inline-flex items-center justify-center px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm font-medium transition-colors min-w-[80px]"
                                             >
                                                 <ScrollText className="w-4 h-4 mr-1" />
                                                 Logs
                                             </button>
-                                            <button 
+                                            <button
                                                 onClick={() => handleViewDevice(device.id)}
                                                 className="inline-flex items-center justify-center px-3 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 text-sm font-medium transition-colors min-w-[80px]"
                                             >
@@ -423,13 +447,13 @@ function App() {
                 </div>
             </div>
 
-            <DeviceDetailModal 
-                isOpen={showDetailModal} 
+            <DeviceDetailModal
+                isOpen={showDetailModal}
                 onClose={() => setShowDetailModal(false)}
                 deviceId={selectedDeviceDetail}
             />
-            <DeviceLogModal 
-                isOpen={showLogModal} 
+            <DeviceLogModal
+                isOpen={showLogModal}
                 onClose={() => setShowLogModal(false)}
                 deviceId={selectedDeviceForLogs}
             />
@@ -437,4 +461,10 @@ function App() {
     )
 }
 
-export default App
+export default function HomePageWrapper() {
+    return (
+        <QueryClientProvider client={queryClient}>
+            <HomePage />
+        </QueryClientProvider>
+    )
+}

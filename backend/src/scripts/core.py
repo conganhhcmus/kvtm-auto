@@ -1,4 +1,5 @@
 from enum import IntEnum
+
 from libs.adb_controller import AdbController, KeyCode
 
 
@@ -62,7 +63,7 @@ def open_game(manager: AdbController):
     manager.open_app(game_package)
     manager.sleep(10)
     manager.click_image("game")
-    manager.sleep(15)
+    manager.sleep(20)
     _close_all_popup(manager, 15)
 
 
@@ -72,13 +73,13 @@ def open_chest(manager: AdbController):
 
     if isFound:
         print("Opening chests...")
-        manager.tap_by_percent(35.0, 22.22)
+        manager.tap(672, 240)
         manager.sleep(0.5)
-        manager.tap_by_percent(35.0, 22.22)
+        manager.tap(672, 240)
         manager.click_image("ruong-go")
         manager.click_image("mo-ngay")
         for _ in range(10):
-            manager.tap_by_percent(50.0, 62.22)
+            manager.tap(960, 672)
             manager.sleep(0.2)
         _close_all_popup(manager)
     manager.sleep(0.5)
@@ -125,7 +126,7 @@ def plant_tree(manager: AdbController, tree=None, num=12, next=True):
 
     points = [slot, *full_tree_point[:num]]
     manager.drag(points)
-    manager.sleep(0.1)
+    manager.sleep(0.5)
 
 
 def harvest_tree(manager: AdbController):
@@ -144,7 +145,7 @@ def harvest_tree(manager: AdbController):
 
     points = [slot, *full_tree_point]
     manager.drag(points)
-    manager.sleep(0.1)
+    manager.sleep(0.5)
 
 
 def make_items(manager: AdbController, floor=1, slot=0, num=1):

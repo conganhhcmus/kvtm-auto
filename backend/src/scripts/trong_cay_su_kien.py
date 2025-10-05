@@ -8,14 +8,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from libs.adb_controller import AdbController
 from models.game_options import GameOptions
 from scripts.core import (
+    go_down,
+    go_last,
+    go_up,
+    harvest_tree,
     open_chest,
     open_game,
-    sell_items,
-    go_down,
-    go_up,
-    go_last,
     plant_tree,
-    harvest_tree,
+    sell_items,
 )
 
 

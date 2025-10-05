@@ -1,6 +1,6 @@
+from io import BytesIO
 from pathlib import Path
 from typing import Optional, Tuple
-from io import BytesIO
 
 import cv2
 import numpy as np

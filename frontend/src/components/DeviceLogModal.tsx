@@ -114,7 +114,7 @@ const DeviceLogModal: React.FC<DeviceLogModalProps> = ({ isOpen, onClose, device
 
                 {/* Footer info */}
                 <div className="text-xs text-gray-500 pt-2 border-t">
-                    Auto-refreshes every 3 seconds • Scroll to see older logs • Click "Copy All" to copy all logs to clipboard
+                    Auto-refreshes every 3 seconds • Scroll to see older logs • Click &apos;Copy All&apos; to copy all logs to clipboard
                 </div>
             </div>
         </Modal>

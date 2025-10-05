@@ -1,10 +1,10 @@
 import os
 import subprocess
-import time
 import threading
+import time
+from enum import Enum
 from functools import wraps
 
-from enum import Enum
 from .image_controller import image_controller
 
 

@@ -23,11 +23,12 @@ module.exports = {
     {
       name: 'kvtm-frontend',
       cwd: './frontend',
-      script: 'npx',
-      args: 'serve -s dist -p 3000',
+      script: 'pnpm',
+      args: 'start',
       interpreter: 'none',
       env: {
-        NODE_ENV: 'production'
+        NODE_ENV: 'production',
+        PORT: '3000'
       },
       autorestart: true,
       watch: false,
