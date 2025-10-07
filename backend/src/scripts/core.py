@@ -14,34 +14,34 @@ class SellOption(IntEnum):
 
 
 full_tree_point = [
-    (720, 900),  # 1
-    (890, 900),  # 2
-    (1060, 900),  # 3
-    (1230, 900),  # 4
-    (1400, 900),  # 5
-    (1570, 900),  # 6
-    (1570, 400),  # 12
-    (1400, 400),  # 11
-    (1230, 400),  # 10
-    (1060, 400),  # 9
-    (890, 400),  # 8
-    (720, 400),  # 7
+    (0.38, 0.83),  # 1
+    (0.46, 0.83),  # 2
+    (0.55, 0.83),  # 3
+    (0.64, 0.83),  # 4
+    (0.73, 0.83),  # 5
+    (0.82, 0.83),  # 6
+    (0.82, 0.37),  # 12
+    (0.73, 0.37),  # 11
+    (0.64, 0.37),  # 10
+    (0.55, 0.37),  # 9
+    (0.46, 0.37),  # 8
+    (0.38, 0.37),  # 7
 ]
 
 full_item_point = [
-    (880, 170),  # 1
-    (1020, 170),  # 2
-    (1160, 170),  # 3
-    (1020, 320),  # 4
-    (1160, 320),  # 5
+    (0.46, 0.16),  # 1
+    (0.53, 0.16),  # 2
+    (0.60, 0.16),  # 3
+    (0.53, 0.30),  # 4
+    (0.60, 0.30),  # 5
 ]
 
 sell_options = [
-    (1040, 250),  # Trees
-    (1040, 410),  # Goods
-    (1040, 575),  # Others
-    (1040, 740),  # Mineral
-    (1040, 910),  # Events
+    (0.54, 0.23),  # Trees
+    (0.54, 0.38),  # Goods
+    (0.54, 0.53),  # Others
+    (0.54, 0.69),  # Mineral
+    (0.54, 0.84),  # Events
 ]
 
 
@@ -63,7 +63,7 @@ def open_game(manager: AdbController):
     manager.open_app(game_package)
     manager.sleep(10)
     manager.click_image("game")
-    manager.sleep(20)
+    manager.sleep(10)
     _close_all_popup(manager, 15)
 
 
@@ -73,27 +73,27 @@ def open_chest(manager: AdbController):
 
     if isFound:
         print("Opening chests...")
-        manager.tap(672, 240)
+        manager.tap(0.35, 0.22)
         manager.sleep(0.5)
-        manager.tap(672, 240)
+        manager.tap(0.35, 0.22)
         manager.click_image("ruong-go")
         manager.click_image("mo-ngay")
         for _ in range(10):
-            manager.tap(960, 672)
+            manager.tap(0.5, 0.62)
             manager.sleep(0.2)
         _close_all_popup(manager)
     manager.sleep(0.5)
 
 
 def go_up(manager: AdbController, times=1):
-    points = [960, 540, 960, 972]
+    points = [0.5, 0.5, 0.5, 0.9]
     for _ in range(times):
         manager.swipe(*points, duration=100)
     manager.sleep(0.5)
 
 
 def go_down(manager: AdbController, times=1):
-    points = [960, 540, 960, 108]
+    points = [0.5, 0.5, 0.5, 0.1]
     for _ in range(times):
         manager.swipe(*points, duration=100)
     manager.sleep(0.5)
@@ -101,22 +101,22 @@ def go_down(manager: AdbController, times=1):
 
 def go_last(manager: AdbController):
     go_up(manager)
-    manager.tap(970, 1055)
+    manager.tap(0.51, 0.98)
     manager.sleep(1)
 
 
 def plant_tree(manager: AdbController, tree=None, num=12, next=True):
     manager.tap(*full_tree_point[0])
     manager.sleep(0.5)
-    slot = (488, 844)
+    slot = (0.25, 0.78)
     if tree:
         slot = manager.find_image_on_screen(f"cay/{tree}")
         attempt = 5
         while not slot and attempt > 0:
             if next:
-                manager.tap(775, 730)
+                manager.tap(0.40, 0.68)
             else:
-                manager.tap(200, 730)
+                manager.tap(0.10, 0.68)
             manager.sleep(0.5)
             slot = manager.find_image_on_screen(f"cay/{tree}")
             attempt -= 1
@@ -149,7 +149,7 @@ def harvest_tree(manager: AdbController):
 
 
 def make_items(manager: AdbController, floor=1, slot=0, num=1):
-    position = (420, 900) if floor == 1 else (420, 400)
+    position = (0.22, 0.83) if floor == 1 else (0.22, 0.37)
 
     for _ in range(max(10, 2 * num)):
         manager.tap(*position)
@@ -165,16 +165,16 @@ def make_items(manager: AdbController, floor=1, slot=0, num=1):
         raise LookupError("Image not found")
 
     for _ in range(num):
-        manager.drag([full_item_point[slot], (740, 450)])
+        manager.drag([full_item_point[slot], (0.39, 0.42)])
         manager.sleep(0.2)
 
     # fix & close
     if floor == 1:
-        manager.tap(190, 760)
+        manager.tap(0.10, 0.70)
     else:
-        manager.tap(190, 270)
+        manager.tap(0.10, 0.25)
     manager.sleep(0.1)
-    manager.tap(1512, 770)
+    manager.tap(0.79, 0.71)
     manager.sleep(0.1)
     _close_all_popup(manager)
 
@@ -214,12 +214,12 @@ def sell_items(manager: AdbController, option: SellOption, items):
     count = 0
 
     # open market
-    manager.tap(1300, 760)
+    manager.tap(0.68, 0.70)
     manager.sleep(1)
 
     # back front market
     for _ in range(2):
-        manager.swipe(310, 650, 1510, 650, 300)
+        manager.swipe(0.16, 0.60, 0.79, 0.60, 300)
         manager.sleep(0.5)
 
     # buy item
@@ -251,15 +251,15 @@ def sell_items(manager: AdbController, option: SellOption, items):
             continue
 
         # move next
-        manager.swipe(1620, 648, 420, 648, 3000)
+        manager.swipe(0.84, 0.60, 0.22, 0.60, 3000)
         manager.sleep(0.5)
         count += 1
         if count > 2:
-            manager.tap(490, 396)
+            manager.tap(0.26, 0.37)
             manager.sleep(0.5)
-            manager.tap(960, 1010)
+            manager.tap(0.50, 0.94)
             manager.sleep(0.5)
-            manager.tap(1200, 85)
+            manager.tap(0.63, 0.08)
             manager.sleep(0.5)
 
             _close_all_popup(manager)
@@ -275,26 +275,26 @@ def _sell(manager: AdbController, setAds=True):
 
     # increase price
     for _ in range(10):
-        manager.tap(1584, 648)
+        manager.tap(0.83, 0.60)
         manager.sleep(0.01)
 
     manager.sleep(0.5)
 
     if not setAds:
-        manager.tap(1416, 850)
+        manager.tap(0.74, 0.79)
         manager.sleep(0.5)
         # sell
-        manager.tap(1416, 985)
+        manager.tap(0.74, 0.91)
         manager.sleep(0.5)
-        manager.tap(1200, 85)
+        manager.tap(0.63, 0.08)
         manager.sleep(0.5)
     else:
         # sell
-        manager.tap(1416, 985)
+        manager.tap(0.74, 0.91)
         manager.sleep(0.5)
-        manager.tap(960, 1010)
+        manager.tap(0.50, 0.94)
         manager.sleep(0.5)
-        manager.tap(1200, 85)
+        manager.tap(0.63, 0.08)
         manager.sleep(0.5)
 
 

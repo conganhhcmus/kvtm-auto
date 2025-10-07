@@ -159,11 +159,18 @@ function HomePage() {
     // Convert devices and scripts to options format
     const deviceOptions = devices.map((device: Device) => {
         const isRunning = !!(device.current_script && device.status === 'busy')
+        const isOffline = device.status === 'offline'
+        let statusSuffix = ''
+        if (isRunning) {
+            statusSuffix = ' (Running - Cannot select)'
+        } else if (isOffline) {
+            statusSuffix = ' (Offline - Cannot select)'
+        }
         return {
             value: device.id,
             label: device.name,
-            description: `Status: ${device.status}${isRunning ? ' (Running - Cannot select)' : ''}`,
-            disabled: isRunning
+            description: `Status: ${device.status}${statusSuffix}`,
+            disabled: isRunning || isOffline
         }
     })
 

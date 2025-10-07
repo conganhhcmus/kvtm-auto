@@ -1,6 +1,7 @@
-import subprocess
 import threading
 from datetime import datetime
+
+from adbutils import AdbClient
 
 from libs.storage_manager import StorageManager
 from models.device import Device
@@ -55,31 +56,28 @@ class DeviceManager:
             self._stop_discovery_flag.clear()
 
         def discover():
+            adb = AdbClient(host="127.0.0.1", port=5037)
+
             while not self._stop_discovery_flag.is_set():
                 changed = False  # Track if any state changed this cycle
 
                 try:
-                    result = subprocess.run(
-                        ["adb", "devices"], capture_output=True, text=True
-                    )
                     current_serials = set()
 
-                    for line in result.stdout.splitlines()[1:]:
-                        if line.strip():
-                            serial = line.split()[0]
-                            current_serials.add(serial)
+                    for device_info in adb.device_list():
+                        serial = device_info.serial
+                        current_serials.add(serial)
 
-                            if serial not in self.devices:
-                                device = Device(serial)
-                                self.devices[serial] = device
-                                changed = True  # New device added
-                            else:
-                                self.devices[serial].last_seen = datetime.now()
-                                changed = True  # last_seen updated
+                        if serial not in self.devices:
+                            device = Device(serial)
+                            self.devices[serial] = device
+                            changed = True  # New device added
+                        else:
+                            self.devices[serial].last_seen = datetime.now()
 
-                                if self.devices[serial].status == "offline":
-                                    self.devices[serial].status = "available"
-                                    # changed already set to True above
+                            if self.devices[serial].status == "offline":
+                                self.devices[serial].status = "available"
+                                changed = True  # Device status changed
 
                     # Mark devices as offline if not found
                     for serial in list(self.devices.keys()):

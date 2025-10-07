@@ -1,37 +1,14 @@
 import os
-import subprocess
-import threading
 import time
-import uuid
-import logging
 from enum import Enum
 from functools import wraps
-from queue import Queue, Empty
+
+from adbutils import AdbError, AdbClient
 
 from .image_controller import image_controller
 
-logger = logging.getLogger(__name__)
 
-
-class AdbControllerError(Exception):
-    """Base exception for ADB controller errors"""
-
-    pass
-
-
-class CoordinateOutOfBoundsError(AdbControllerError):
-    """Raised when coordinates are outside screen bounds"""
-
-    def __init__(self, coord_type, value, max_value):
-        self.coord_type = coord_type
-        self.value = value
-        self.max_value = max_value
-        super().__init__(
-            f"{coord_type} coordinate {value} out of bounds [0, {max_value}]"
-        )
-
-
-def retry_on_error(max_attempts=3, delay=0.5, return_value=None, skip_log=False):
+def retry_on_error(max_attempts=3, delay=0.5, return_value=None):
     """
     Decorator to retry a function on error with exponential backoff.
 
@@ -39,7 +16,6 @@ def retry_on_error(max_attempts=3, delay=0.5, return_value=None, skip_log=False)
         max_attempts: Maximum number of attempts (default: 3)
         delay: Initial delay between attempts in seconds (default: 0.5)
         return_value: Value to return on final failure (default: None)
-        skip_log: Skip logging of errors (default: False)
     """
 
     def decorator(func):
@@ -48,24 +24,17 @@ def retry_on_error(max_attempts=3, delay=0.5, return_value=None, skip_log=False)
             for attempt in range(max_attempts):
                 try:
                     return func(*args, **kwargs)
-                except (OSError, IOError, subprocess.SubprocessError) as e:
-                    # Network/IO/Subprocess specific errors - retryable
+                except (
+                    IOError,
+                    AdbError,
+                ):
                     current_delay = delay * (2**attempt)  # Exponential backoff
                     if attempt < max_attempts - 1:
-                        if not skip_log:
-                            logger.warning(
-                                f"{func.__name__} failed (attempt {attempt + 1}/{max_attempts}): {e.__class__.__name__}: {e}"
-                            )
                         time.sleep(current_delay)
                     else:
-                        if not skip_log:
-                            logger.error(
-                                f"{func.__name__} failed after {max_attempts} attempts: {e.__class__.__name__}: {e}"
-                            )
                         return return_value
                 except Exception as e:
-                    # Unexpected errors - log and fail immediately
-                    logger.error(
+                    print(
                         f"{func.__name__} encountered unexpected error: {e.__class__.__name__}: {e}"
                     )
                     return return_value
@@ -129,247 +98,29 @@ class KeyCode(Enum):
     ESC = 111
 
 
-class _ShellSession:
-    """Manages a persistent ADB shell session for a device with improved stability"""
-
-    def __init__(self, serial):
-        self.serial = serial
-        self._process = None
-        self._lock = threading.Lock()
-        self._stdout_queue = Queue(maxsize=1000)
-        self._stderr_queue = Queue(maxsize=1000)
-        self._reader_threads = []
-        self._start_shell()
-
-    def _enqueue_output(self, pipe, queue):
-        """Helper to read pipe output into a queue (runs in thread)"""
-        try:
-            for line in iter(pipe.readline, ""):
-                if line:
-                    # Check if queue is full, remove oldest entry if needed
-                    if queue.full():
-                        try:
-                            queue.get_nowait()
-                        except Empty:
-                            pass
-                    # Add new line to queue
-                    queue.put(line, block=False)
-        except ValueError:
-            # Pipe closed
-            pass
-        finally:
-            pipe.close()
-
-    def _start_shell(self):
-        """Start the persistent shell subprocess with output readers"""
-        try:
-            self._process = subprocess.Popen(
-                ["adb", "-s", self.serial, "shell"],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                bufsize=1,  # Line buffered
-            )
-
-            # Start threads to consume stdout and stderr
-            stdout_thread = threading.Thread(
-                target=self._enqueue_output,
-                args=(self._process.stdout, self._stdout_queue),
-                daemon=True,
-            )
-            stderr_thread = threading.Thread(
-                target=self._enqueue_output,
-                args=(self._process.stderr, self._stderr_queue),
-                daemon=True,
-            )
-
-            stdout_thread.start()
-            stderr_thread.start()
-            self._reader_threads = [stdout_thread, stderr_thread]
-
-            logger.info(f"Started shell session for {self.serial}")
-        except (OSError, subprocess.SubprocessError) as e:
-            logger.exception(f"Error starting shell session for {self.serial}")
-            self._process = None
-
-    def _ensure_running(self):
-        """Ensure shell is running, restart if needed"""
-        if self._process is None or self._process.poll() is not None:
-            if self._process is not None:
-                logger.warning(f"Shell session died for {self.serial}, restarting...")
-                self._cleanup_process()
-            # Clear queues before restart
-            while not self._stdout_queue.empty():
-                try:
-                    self._stdout_queue.get_nowait()
-                except Empty:
-                    break
-            while not self._stderr_queue.empty():
-                try:
-                    self._stderr_queue.get_nowait()
-                except Empty:
-                    break
-            self._start_shell()
-
-    def _drain_stderr(self):
-        """Drain stderr queue to prevent memory buildup"""
-        try:
-            while not self._stderr_queue.empty():
-                self._stderr_queue.get_nowait()
-        except Empty:
-            pass
-
-    def execute(self, command, timeout=5):
-        """
-        Execute a command in the shell and wait for completion.
-
-        Args:
-            command: Shell command to execute
-            timeout: Maximum time to wait for command completion (seconds)
-
-        Returns:
-            True if command executed successfully, False otherwise
-        """
-        with self._lock:
-            try:
-                self._ensure_running()
-                if self._process is None:
-                    logger.error(
-                        f"Cannot execute command, shell not running for {self.serial}"
-                    )
-                    return False
-
-                # Generate unique marker for this command
-                marker = f"<<<CMD_{uuid.uuid4().hex[:8]}>>>"
-
-                # Send command followed by marker
-                full_command = f"{command} 2>&1; echo '{marker}'\n"
-                self._process.stdin.write(full_command)
-                self._process.stdin.flush()
-
-                # Wait for marker in output with proper timeout
-                start_time = time.time()
-                while time.time() - start_time < timeout:
-                    try:
-                        # Use queue with timeout to avoid blocking forever
-                        line = self._stdout_queue.get(timeout=0.1)
-                        if marker in line:
-                            # Drain stderr to prevent memory buildup
-                            self._drain_stderr()
-                            return True
-                    except Empty:
-                        # Check if process died
-                        if self._process.poll() is not None:
-                            logger.error(
-                                f"Shell process died during command execution for {self.serial}"
-                            )
-                            self._process = None
-                            return False
-                        continue
-
-                # Timeout - log but don't kill shell, just return False
-                logger.warning(
-                    f"Command timed out for {self.serial}: {command[:50]}..."
-                )
-                # Drain any remaining output
-                try:
-                    while True:
-                        self._stdout_queue.get_nowait()
-                except Empty:
-                    pass
-                # Also drain stderr to prevent memory buildup
-                self._drain_stderr()
-                return False
-
-            except (OSError, IOError, subprocess.SubprocessError) as e:
-                logger.exception(f"Error executing command in shell for {self.serial}")
-                self._cleanup_process()
-                self._process = None
-                return False
-            except Exception as e:
-                logger.exception(
-                    f"Unexpected error executing command for {self.serial}"
-                )
-                self._cleanup_process()
-                self._process = None
-                return False
-
-    def _cleanup_process(self):
-        """Safely cleanup subprocess"""
-        if self._process:
-            try:
-                # Try graceful termination first
-                self._process.terminate()
-                self._process.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                # Force kill if termination fails
-                try:
-                    self._process.kill()
-                    self._process.wait(timeout=1)
-                except Exception as e:
-                    logger.exception(f"Failed to kill shell process for {self.serial}")
-            except Exception as e:
-                logger.exception(f"Error during process cleanup for {self.serial}")
-
-    def close(self):
-        """Close the shell session"""
-        with self._lock:
-            if self._process:
-                try:
-                    self._process.stdin.write("exit\n")
-                    self._process.stdin.flush()
-                    self._process.wait(timeout=2)
-                except Exception:
-                    pass
-                finally:
-                    self._cleanup_process()
-                    self._process = None
-                    logger.info(f"Closed shell session for {self.serial}")
-
-
 class AdbController:
     # Assets directory relative to this file's location
     ASSETS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets")
 
     def __init__(self, serial):
+        # Connect to ADB server at 127.0.0.1:5037 (standard port)
+        self.adb = AdbClient(host="127.0.0.1", port=5037)
+        self.device = self.adb.device(serial=serial)
         self.serial = serial
-        self._shell = _ShellSession(serial)
         self.screen_width, self.screen_height = self._get_screen_size()
 
-        # Touch device attributes
-        self.touch_device = (
-            "/dev/input/event2"  # Default touch device path for most emulators/devices
-        )
+        # Default touch device path for most emulators/devices
+        self.touch_device = "/dev/input/event2"
         # BlueStacks Virtual Touch uses 0-32767 coordinate range
         self.device_max_x = 32767
         self.device_max_y = 32767
 
     def _get_screen_size(self):
-        """Get device screen size"""
+        """Get device screen size using adbutils"""
         try:
-            result = subprocess.run(
-                ["adb", "-s", self.serial, "shell", "wm", "size"],
-                capture_output=True,
-                check=True,
-                text=True,
-                timeout=10,
-            )
-            # Output format: "Physical size: 1080x1920"
-            size_line = result.stdout.strip()
-            size_part = size_line.split(": ")[1]  # Get "1080x1920"
-            width, height = map(int, size_part.split("x"))
-            logger.info(f"Detected screen size for {self.serial}: {width}x{height}")
+            width, height = self.device.window_size()
             return width, height
-        except (
-            subprocess.SubprocessError,
-            subprocess.TimeoutExpired,
-            ValueError,
-            IndexError,
-        ) as e:
-            logger.warning(
-                f"Error getting screen size for {self.serial}: {e}, using default 1080x1920"
-            )
+        except Exception:
             # Default fallback values
             return 1080, 1920
 
@@ -382,49 +133,48 @@ class AdbController:
             # Just a filename, look in assets directory
             return os.path.join(self.ASSETS_DIR, image_path)
 
-    def _validate_coords(self, x, y):
-        """Validate coordinates are within screen bounds"""
-        if not (0 <= x <= self.screen_width):
-            raise CoordinateOutOfBoundsError("X", x, self.screen_width)
-        if not (0 <= y <= self.screen_height):
-            raise CoordinateOutOfBoundsError("Y", y, self.screen_height)
-
     def _convert_to_device_coords(self, screen_x, screen_y):
-        """Convert screen coordinates to device coordinates for BlueStacks Virtual Touch"""
-        self._validate_coords(screen_x, screen_y)
-        device_x = int((screen_x / self.screen_width) * self.device_max_x)
-        device_y = int((screen_y / self.screen_height) * self.device_max_y)
+        """Convert percentage coordinates (0.0-1.0) to device coordinates for BlueStacks Virtual Touch"""
+        device_x = int(screen_x * self.device_max_x)
+        device_y = int(screen_y * self.device_max_y)
         return device_x, device_y
 
-    @retry_on_error(return_value=False, skip_log=False)
-    def tap(self, x, y):
-        """Simulate a tap at (x, y)"""
-        self._validate_coords(x, y)
-        result = self._shell.execute(f"input tap {x} {y}")
-        if not result:
-            raise OSError(f"Failed to tap at ({x}, {y})")
-        return result
+    def _pixel_to_percent(self, x, y):
+        """Convert pixel coordinates to percentage coordinates (0.0-1.0)"""
+        percent_x = x / self.screen_width
+        percent_y = y / self.screen_height
+        return percent_x, percent_y
 
-    @retry_on_error(skip_log=False)
+    @retry_on_error(return_value=False)
+    def tap(self, x, y):
+        """Simulate a tap at (x, y) using adbutils"""
+        self.device.click(x, y)
+        return True
+
+    @retry_on_error()
     def capture_screen(self):
-        """Capture device screen as PNG bytes"""
-        result = subprocess.run(
-            ["adb", "-s", self.serial, "shell", "screencap", "-p"],
-            capture_output=True,
-            check=True,
-        )
-        return result.stdout
+        """Capture device screen as PNG bytes using adbutils screenshot"""
+        import io
+
+        # Use built-in screenshot method which returns PIL.Image
+        pil_image = self.device.screenshot()
+
+        # Convert PIL Image to PNG bytes for image_controller
+        buffer = io.BytesIO()
+        pil_image.save(buffer, format="PNG")
+        return buffer.getvalue()
 
     @retry_on_error()
     def find_image_on_screen(self, template_path, threshold=0.9):
-        """Find template image on screen using bytes-based approach"""
+        """Find template image on screen using bytes-based approach. Returns percentage coordinates (0.0-1.0)."""
         screen_bytes = self.capture_screen()
         template_bytes = image_controller.read_asset_image_bytes(template_path)
         coords = image_controller.get_coordinate(
             screen_bytes, template_bytes, threshold
         )
         if coords:
-            return coords
+            # Convert pixel coordinates to percentage
+            return self._pixel_to_percent(coords[0], coords[1])
         raise IOError(f"Image '{template_path}' not found on screen")
 
     @retry_on_error(return_value=False)
@@ -453,67 +203,48 @@ class AdbController:
             return True
         raise IOError(f"Text '{target_text}' not found on screen")
 
-    @retry_on_error(return_value=False, skip_log=False)
+    @retry_on_error(return_value=False)
     def press_key(self, keycode):
-        """Press a key using Android keycode"""
-        result = self._shell.execute(f"input keyevent {keycode}")
-        if not result:
-            raise OSError(f"Failed to press key {keycode}")
-        return result
+        """Press a key using Android keycode via adbutils"""
+        self.device.keyevent(str(keycode))
+        return True
 
-    @retry_on_error(return_value=False, skip_log=False)
+    @retry_on_error(return_value=False)
     def close_app(self, package_name: str):
-        """Force stop an app by package name"""
-        result = self._shell.execute(f"am force-stop {package_name}")
-        if not result:
-            raise OSError(f"Failed to close app {package_name}")
-        return result
+        """Force stop an app by package name using adbutils"""
+        self.device.app_stop(package_name)
+        return True
 
-    @retry_on_error(return_value=False, skip_log=False)
-    def open_app(self, package_name: str):
-        """Open an app by package name"""
-        result = self._shell.execute(
-            f"monkey -p {package_name} -c android.intent.category.LAUNCHER 1"
-        )
-        if not result:
-            raise OSError(f"Failed to open app {package_name}")
-        return result
-
-    @retry_on_error(return_value=False, skip_log=False)
-    def kill_monkey(self):
-        """Kill all monkey processes on device"""
-        result = self._shell.execute("pkill -f monkey")
-        if not result:
-            raise OSError("Failed to kill monkey process")
-        return result
+    @retry_on_error(return_value=False)
+    def open_app(self, package_name: str, activity: str = None):
+        """Open an app by package name using adbutils"""
+        self.device.app_start(package_name, activity)
+        return True
 
     def sleep(self, duration):
         """Sleep for a given duration in seconds"""
         time.sleep(duration)
 
-    @retry_on_error(return_value=False, skip_log=False)
+    @retry_on_error(return_value=False)
     def swipe(self, x1, y1, x2, y2, duration=300):
         """
-        Swipe from (x1, y1) to (x2, y2)
+        Swipe from (x1, y1) to (x2, y2) using adbutils
 
         Args:
             x1, y1: Starting coordinates
             x2, y2: Ending coordinates
             duration: Duration of swipe in milliseconds (default: 300)
         """
-        self._validate_coords(x1, y1)
-        self._validate_coords(x2, y2)
-        result = self._shell.execute(f"input swipe {x1} {y1} {x2} {y2} {duration}")
-        if not result:
-            raise OSError(f"Failed to swipe from ({x1}, {y1}) to ({x2}, {y2})")
-        return result
+        # adbutils.swipe() expects duration in seconds
+        self.device.swipe(x1, y1, x2, y2, duration / 1000)
+        return True
 
     # High-level gesture methods
 
-    @retry_on_error(return_value=False, skip_log=False)
+    @retry_on_error(return_value=False)
     def drag(self, points):
         """
-        Smooth drag through a series of points.
+        Smooth drag through a series of points using sendevent.
 
         Args:
             points: List of (x, y) coordinate tuples
@@ -559,17 +290,12 @@ class AdbController:
             [
                 f"sendevent {device} {EventCode.EV_SYN.value} {EventCode.SYN_MT_REPORT.value} 0",
                 f"sendevent {device} {EventCode.EV_SYN.value} {EventCode.SYN_REPORT.value} 0",
+                f"sendevent {device} {EventCode.EV_SYN.value} {EventCode.SYN_MT_REPORT.value} 0",
+                f"sendevent {device} {EventCode.EV_SYN.value} {EventCode.SYN_REPORT.value} 0",
             ]
         )
 
-        # Execute single optimized command
+        # Execute single optimized command via adbutils
         full_command = "; ".join(commands)
-        result = self._shell.execute(full_command, timeout=30)
-        if not result:
-            raise OSError(f"Failed to drag through {len(points)} points")
-        return result
-
-    def close(self):
-        """Close the ADB controller and cleanup resources"""
-        if self._shell:
-            self._shell.close()
+        self.device.shell(full_command)
+        return True

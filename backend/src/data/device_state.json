@@ -2,7 +2,7 @@
   "emulator-5554": {
     "name": "Kai",
     "status": "available",
-    "last_seen": "2025-10-06T08:27:29.952444",
+    "last_seen": "2025-10-07T23:27:04.906554",
     "current_script": null,
     "current_script_name": null,
     "current_execution_id": null,
@@ -11,7 +11,16 @@
   "emulator-5574": {
     "name": "My Hanh",
     "status": "available",
-    "last_seen": "2025-10-06T08:27:29.952948",
+    "last_seen": "2025-10-07T23:27:04.906568",
+    "current_script": null,
+    "current_script_name": null,
+    "current_execution_id": null,
+    "game_options": null
+  },
+  "emulator-5564": {
+    "name": "Cong Anh",
+    "status": "offline",
+    "last_seen": "2025-10-06T21:48:58.006899",
     "current_script": null,
     "current_script_name": null,
     "current_execution_id": null,
