@@ -8,10 +8,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from libs.adb_controller import AdbController
 from models.game_options import GameOptions
 from scripts.core import (
+    SellOption,
     go_down,
     go_last,
     go_up,
     harvest_tree,
+    make_items,
     open_chest,
     open_game,
     plant_tree,
@@ -21,7 +23,7 @@ from scripts.core import (
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python vai_xanh_la.py <device_id> [game_options_json]")
+        print("Usage: python nuoc_hoa_tao.py <device_id> [game_options_json]")
         sys.exit(1)
 
     device_id = sys.argv[1]
@@ -41,59 +43,66 @@ def main():
     if game_options.open_game:
         open_game(manager)
 
-    for i in range(1000):
-        print(f"{i}: Run trong cay su kien")
-        if game_options.open_chest and (i % 10) == 0:
+    for i in range(100):
+        print(f"{i}: Run nuoc hoa tao")
+        if game_options.open_chest:
             open_chest(manager)
 
-        # Todo
-        if i == 0:
+        for j in range(10):
+            isEven = j % 2 == 0
+            # auto
             go_up(manager)
-            plant_tree(manager)
+            plant_tree(manager, "tao")
             go_up(manager, 2)
-            plant_tree(manager)
+            plant_tree(manager, "tao")
             go_up(manager, 2)
-            plant_tree(manager)
+            plant_tree(manager, "tao")
             go_up(manager, 2)
-            plant_tree(manager)
+            plant_tree(manager, "tao")
+            go_down(manager, 6)
+
+            if isEven:
+                harvest_tree(manager)
+                plant_tree(manager, "tao")
+                go_up(manager, 2)
+
+            harvest_tree(manager)
+            plant_tree(manager, "tuyet")
             go_up(manager, 2)
-            plant_tree(manager)
+            harvest_tree(manager)
+            plant_tree(manager, "tuyet")
+            go_up(manager, 2)
+            harvest_tree(manager)
+
+            if not isEven:
+                go_up(manager, 2)
+                harvest_tree(manager)
+
+            go_down(manager, 6)
+
+            harvest_tree(manager)
+            make_items(manager, 2, 0, 6)  # nuoc tao
+            go_up(manager, 2)
+            harvest_tree(manager)
+            go_up(manager, 2)
+            if isEven:
+                harvest_tree(manager)
+
+            make_items(manager, 1, 1, 6)  # tinh dau tao
+            go_up(manager, 2)
+            make_items(manager, 2, 1, 6)  # nuoc hoa tao
             go_last(manager)
 
-        if i < 999:
-            go_up(manager)
-            harvest_tree(manager)
-            plant_tree(manager)
-            go_up(manager, 2)
-            harvest_tree(manager)
-            plant_tree(manager)
-            go_up(manager, 2)
-            harvest_tree(manager)
-            plant_tree(manager)
-            go_up(manager, 2)
-            harvest_tree(manager)
-            plant_tree(manager)
-            go_up(manager, 2)
-            harvest_tree(manager)
-            plant_tree(manager)
-            go_last(manager)
-
-        else:
-            go_up(manager)
-            harvest_tree(manager)
-            go_up(manager, 2)
-            harvest_tree(manager)
-            go_up(manager, 2)
-            harvest_tree(manager)
-            go_up(manager, 2)
-            harvest_tree(manager)
-            go_up(manager, 2)
-            harvest_tree(manager)
-            go_last(manager)
+        if game_options.sell_items:
+            sell_items(
+                manager,
+                SellOption.GOODS,
+                [{"key": "nuoc-hoa-tao", "value": 6}],
+            )
 
         i += 1
 
-    print("Trong cay su kien automation completed")
+    print("The automation completed")
 
 
 if __name__ == "__main__":

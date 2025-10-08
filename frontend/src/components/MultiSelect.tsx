@@ -85,9 +85,9 @@ export default function MultiSelect({
             selectedOptions.map((option) => (
               <span
                 key={option.value}
-                className={`inline-flex items-center px-2 py-1 text-xs rounded-md ${
-                  option.disabled 
-                    ? 'bg-gray-100 text-gray-500' 
+                className={`inline-flex items-center px-2 text-sm sm:text-base rounded-md ${
+                  option.disabled
+                    ? 'bg-gray-100 text-gray-500'
                     : 'bg-blue-100 text-blue-800'
                 }`}
               >

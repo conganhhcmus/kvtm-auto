@@ -23,7 +23,7 @@ from scripts.core import (
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python vai_xanh_la.py <device_id> [game_options_json]")
+        print("Usage: python vai_tim.py <device_id> [game_options_json]")
         sys.exit(1)
 
     device_id = sys.argv[1]
@@ -83,7 +83,7 @@ def main():
 
         i += 1
 
-    print("Vai xanh la automation completed")
+    print("The automation completed")
 
 
 if __name__ == "__main__":

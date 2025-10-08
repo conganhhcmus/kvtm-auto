@@ -80,7 +80,7 @@ def main():
 
         i += 1
 
-    print("Vai xanh la automation completed")
+    print("The automation completed")
 
 
 if __name__ == "__main__":

@@ -121,3 +121,6 @@ settings.local.json
 *.zip
 *.rar
 *.7z
+
+# Data runtime
+**/data/*

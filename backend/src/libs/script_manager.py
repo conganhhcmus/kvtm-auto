@@ -52,4 +52,4 @@ class ScriptManager:
         return self.scripts.get(script_id)
 
     def list_scripts(self):
-        return sorted(self.scripts.values(), key=lambda s: s.name)
+        return sorted(self.scripts.values(), key=lambda s: s.path)
