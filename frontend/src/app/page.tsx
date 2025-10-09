@@ -6,6 +6,7 @@ import { deviceApi, scriptApi, executeApi, GameOptions, Script } from '@/api'
 import { Play, Square, ChevronDown, ChevronUp, MonitorOff, ScrollText, Info, Monitor } from 'lucide-react'
 import DeviceDetailModal from '@/components/DeviceDetailModal'
 import DeviceLogModal from '@/components/DeviceLogModal'
+import LiveScreenModal from '@/components/LiveScreenModal'
 import SearchableSelect from '@/components/SearchableSelect'
 import MultiSelect from '@/components/MultiSelect'
 
@@ -39,6 +40,8 @@ function HomePage() {
     const [selectedDeviceDetail, setSelectedDeviceDetail] = useState('')
     const [showLogModal, setShowLogModal] = useState(false)
     const [selectedDeviceForLogs, setSelectedDeviceForLogs] = useState('')
+    const [showLiveScreenModal, setShowLiveScreenModal] = useState(false)
+    const [selectedDeviceForStream, setSelectedDeviceForStream] = useState({id: '-1', name: 'null'})
     const [isControlPanelExpanded, setIsControlPanelExpanded] = useState(true)
     const [stoppingDevices, setStoppingDevices] = useState<Set<string>>(new Set())
 
@@ -410,7 +413,10 @@ function HomePage() {
                                                 )}
                                             </button>
                                             <button
-                                                onClick={() => alert("Support later")}
+                                                onClick={() => {
+                                                    setSelectedDeviceForStream({id: device.id, name: device.name})
+                                                    setShowLiveScreenModal(true)
+                                                }}
                                                 className="inline-flex items-center justify-center px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium transition-colors min-w-[80px]"
                                             >
                                                 <Monitor className="w-4 h-4 mr-1" />
@@ -463,6 +469,12 @@ function HomePage() {
                 isOpen={showLogModal}
                 onClose={() => setShowLogModal(false)}
                 deviceId={selectedDeviceForLogs}
+            />
+            <LiveScreenModal
+                isOpen={showLiveScreenModal}
+                onClose={() => setShowLiveScreenModal(false)}
+                deviceId={selectedDeviceForStream.id}
+                deviceName={selectedDeviceForStream.name}
             />
         </div>
     )

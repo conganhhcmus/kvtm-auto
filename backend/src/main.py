@@ -2,21 +2,31 @@ import argparse
 
 from flask import Flask, jsonify
 from flask_cors import CORS
+from flask_socketio import SocketIO
 
 from apis.device_apis import device_bp
 from apis.execution_apis import execution_bp
 from apis.script_apis import script_bp
+from apis.stream_apis import stream_bp, init_stream_handlers
 from apis.system_apis import system_bp
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}})
+
+# Initialize SocketIO with CORS support
+# Using threading mode for better compatibility (eventlet has issues with Python 3.13+)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 
 # Register blueprints
 app.register_blueprint(device_bp)
 app.register_blueprint(script_bp)
 app.register_blueprint(execution_bp)
+app.register_blueprint(stream_bp)
 app.register_blueprint(system_bp)
+
+# Initialize Socket.IO stream handlers
+init_stream_handlers(socketio)
 
 
 @app.route("/")
@@ -32,6 +42,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     if args.env == "dev":
-        app.run(host="0.0.0.0", port=3001, debug=True)  # auto reload
+        socketio.run(app, host="0.0.0.0", port=3001, debug=True)  # auto reload
     else:
-        app.run(host="0.0.0.0", port=3001, debug=False)  # no reload
+        socketio.run(app, host="0.0.0.0", port=3001, debug=False)  # no reload

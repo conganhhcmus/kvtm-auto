@@ -4,6 +4,7 @@
   "private": true,
   "description": "KVTM Auto - Backend (Flask + Python)",
   "scripts": {
+    "install": "poetry lock && poetry install",
     "dev": "poetry run python src/main.py --env dev",
     "build": "echo 'Backend build: No build step required for Flask'",
     "prod": "poetry run gunicorn -w 4 -b 0.0.0.0:3001 --timeout 120 src.main:app",
