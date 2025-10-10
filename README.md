@@ -6,6 +6,7 @@
 
 - **Multi-Device Management**: Connect and control multiple Android devices simultaneously
 - **Web-Based UI**: Modern Next.js interface for managing devices and scripts
+- **Live Screen Streaming**: Real-time H.264 video streaming via WebSocket for monitoring device screens
 - **Real-Time Logging**: Live log streaming from running automation scripts
 - **Image Recognition**: OpenCV-based template matching for visual automation
 - **OCR Support**: Text recognition and interaction using Tesseract
@@ -17,16 +18,18 @@
 
 ### Backend
 - **Python 3.9+** with Poetry
-- **Flask** - REST API server
+- **Flask + Flask-SocketIO** - REST API server with WebSocket support
+- **adbutils 2.10.2** - Android device control library
 - **OpenCV** - Image recognition and matching
 - **Tesseract OCR** - Text detection
-- **ADB** - Android device control
 
 ### Frontend
 - **Next.js 14** - React framework with App Router
 - **React 18** - UI library
 - **TypeScript** - Type-safe development
 - **TanStack Query** - Data fetching and caching
+- **Socket.IO Client** - WebSocket communication
+- **JMuxer** - H.264 video playback
 - **Tailwind CSS** - Utility-first styling
 - **Axios** - HTTP client
 
@@ -99,10 +102,10 @@ pnpm dev
 ```
 
 This will start:
-- **Backend**: `http://localhost:3001` (Flask with auto-reload)
-- **Frontend**: `http://localhost:3000` (Next.js dev server)
+- **Backend**: `http://localhost:3001` (Flask with Socket.IO and auto-reload)
+- **Frontend**: `http://localhost:3000` (Next.js dev server with custom Express proxy)
 
-The frontend automatically proxies `/api` requests to the backend.
+The frontend automatically proxies `/api` and `/socket.io` requests to the backend.
 
 ### Production Mode
 
@@ -175,13 +178,23 @@ The application automatically discovers connected Android devices. Device status
    - Open Chest
    - Sell Items
 4. Click "Start" to begin execution
-5. View real-time logs in the device panel
+5. Monitor execution via:
+   - **View** button - Live H.264 video stream of device screen
+   - **Logs** button - Real-time script output logs
+   - **Detail** button - Device information and status
 
 ### Viewing Logs
 
 - **Real-time logs**: Automatically stream during script execution
 - **Log history**: Persisted to `backend/src/data/logs/<device_serial>.log`
 - **Clear logs**: Use the "Clear Logs" button in device details
+
+### Live Screen Monitoring
+
+Click the **View** button on any running device to:
+- Stream live H.264 video of the device screen
+- Monitor automation in real-time
+- Low latency streaming via WebSocket (2.5 Mbps)
 
 ## Writing Custom Scripts
 
@@ -226,6 +239,8 @@ def main():
         open_game(manager)
 
     # Your automation logic
+    # Note: All coordinates are percentage-based (0.0-1.0)
+    # Example: manager.tap(0.5, 0.5) taps center of screen
     for i in range(10):
         print(f"Loop {i}: Planting trees...")
         plant_tree(manager, "tree-type")
@@ -258,12 +273,15 @@ The `core.py` module provides shared automation functions:
 **Market**:
 - `sell_items(manager, option, items)` - Sell items at market
 
-**ADB Controller Methods**:
-- `tap(x, y)` - Tap at coordinates
-- `swipe(x1, y1, x2, y2, duration)` - Swipe gesture
-- `find_image_on_screen(template_path, threshold=0.9)` - Find image
+**ADB Controller Methods** (uses percentage coordinates 0.0-1.0):
+- `tap(x, y)` - Tap at percentage coordinates (e.g., `0.5, 0.5` for center)
+- `swipe(x1, y1, x2, y2, duration)` - Swipe gesture with percentage coords
+- `drag(points)` - Multi-point drag (e.g., `[(0.25, 0.78), (0.38, 0.83)]`)
+- `find_image_on_screen(template_path, threshold=0.9)` - Find image, returns percentage coords
 - `click_image(template_path)` - Find and click image
 - `click_text(text, lang="eng")` - OCR-based text clicking
+- `press_key(keycode)` - Press Android key (use KeyCode enum)
+- `capture_screen()` - Take screenshot
 
 ### Script Discovery
 
@@ -357,10 +375,15 @@ The project includes automated code quality tools:
 - `POST /api/execute/stop` - Stop specific execution
 - `POST /api/execute/stop-all` - Stop all running scripts
 
+**Live Streaming** (Socket.IO via WebSocket):
+- `start_stream` event - Start H.264 video stream for device
+- `stop_stream` event - Stop current stream
+- `stream_data` event - Receive video chunks (base64-encoded H.264)
+
 **System**:
 - `GET /health` - Health check
 
-For detailed API documentation, see [CLAUDE.md](./CLAUDE.md).
+For detailed API documentation and architecture, see [CLAUDE.md](./CLAUDE.md).
 
 ## Production Deployment
 
@@ -407,6 +430,14 @@ PM2 configuration is defined in `ecosystem.config.js`.
 2. Check screen resolution matches template expectations
 3. Lower threshold parameter (default 0.9) for more lenient matching
 4. Use `find_image_on_screen()` to debug matching
+
+### Live Streaming Not Working
+
+1. Ensure backend is running with Socket.IO support
+2. Check that frontend custom server (`server.ts`) is running (not standard Next.js server)
+3. Verify WebSocket connection in browser developer tools (Network → WS tab)
+4. Check device supports `screenrecord` command: `adb shell screenrecord --help`
+5. Look for errors in backend logs related to H.264 streaming
 
 ## Contributing
 

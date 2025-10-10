@@ -1,4 +1,3 @@
-import base64
 import threading
 import time
 from typing import Dict
@@ -10,7 +9,9 @@ from flask_socketio import SocketIO, emit
 stream_bp = Blueprint("stream_bp", __name__)
 
 # Stream configuration
-STREAM_BIT_RATE = 2500000  # 2.5 Mbps - balanced for live monitoring (lower latency, good quality)
+STREAM_BIT_RATE = (
+    2500000  # 2.5 Mbps - balanced for live monitoring (lower latency, good quality)
+)
 STREAM_TIME_LIMIT = 180  # 3 minutes
 
 # Track active streams: {session_id: {'device_id': str, 'thread': Thread, 'stop_flag': bool}}
@@ -133,7 +134,7 @@ def stream_screen(socketio: SocketIO, session_id: str, device_id: str):
         # Use shell with stream=True to get raw H.264 stream
         connection = device.shell(
             f"screenrecord --output-format=h264 --bit-rate={STREAM_BIT_RATE} --time-limit={STREAM_TIME_LIMIT} -",
-            stream=True
+            stream=True,
         )
 
         print(f"Screenrecord stream started for device: {device_id}")
@@ -187,14 +188,9 @@ def stream_screen(socketio: SocketIO, session_id: str, device_id: str):
                                 )
                                 break
 
-                            # Encode chunk to base64 for Socket.IO transport
-                            encoded_chunk = base64.b64encode(chunk_to_send).decode(
-                                "utf-8"
-                            )
-
                             # Emit to specific session
                             socketio.emit(
-                                "stream_data", {"chunk": encoded_chunk}, room=session_id
+                                "stream_data", {"chunk": chunk_to_send}, room=session_id
                             )
                             chunks_sent += 1
 
@@ -214,15 +210,16 @@ def stream_screen(socketio: SocketIO, session_id: str, device_id: str):
                         f"[Stream {session_id}] Buffer too large ({len(buffer)} bytes), flushing"
                     )
                     chunk_to_send = bytes(buffer)
-                    encoded_chunk = base64.b64encode(chunk_to_send).decode("utf-8")
                     socketio.emit(
-                        "stream_data", {"chunk": encoded_chunk}, room=session_id
+                        "stream_data", {"chunk": chunk_to_send}, room=session_id
                     )
                     chunks_sent += 1
                     buffer.clear()
 
             except Exception as read_error:
-                print(f"[Stream {session_id}] Error reading from connection: {read_error}")
+                print(
+                    f"[Stream {session_id}] Error reading from connection: {read_error}"
+                )
                 if (
                     "closed" in str(read_error).lower()
                     or "connection" in str(read_error).lower()

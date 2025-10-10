@@ -5,10 +5,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 **KVTM Auto** is a full-stack Android device automation platform for automating mobile games via ADB (Android Debug Bridge). The system uses:
-- **Backend**: Flask (Python 3.9+) on port 3001
-- **Frontend**: Next.js 14 + React 18 + TypeScript on port 3000 (proxies `/api` to backend)
+- **Backend**: Flask + Flask-SocketIO (Python 3.9+) on port 3001 with WebSocket support
+- **Frontend**: Next.js 14 + React 18 + TypeScript on port 3000 with custom Express server
 - **Monorepo**: Turborepo with pnpm workspace management
-- **Core Technology**: ADB for device control, OpenCV for image matching, subprocess for script execution
+- **Core Technology**: adbutils for device control, OpenCV for image matching, Socket.IO for live streaming, subprocess for script execution
+
+## Prerequisites
+
+- **Node.js** >= 18.0.0
+- **pnpm** >= 9.0.0
+- **Python** >= 3.9
+- **Poetry** - Python dependency management
+- **ADB (Android Debug Bridge)** - For device communication
+- **Android Device/Emulator** - With USB debugging enabled
+
+**Key Dependencies**:
+- **Backend**: adbutils 2.10.2, Flask 3.0+, OpenCV, Tesseract OCR
+- **Frontend**: Next.js 14, React 18, Socket.IO Client, JMuxer
 
 ## Development Commands
 
@@ -48,7 +61,7 @@ npm run format                                    # Fix linting issues
 npm run clean                                     # Clean build artifacts
 ```
 
-**Important**: Frontend uses Next.js and proxies `/api` requests to `http://localhost:3001` via `next.config.js` rewrites. Backend URL can be configured with `NEXT_PUBLIC_BACKEND_URL` env variable.
+**Important**: Frontend uses custom Express server (`server.ts`) that proxies `/api` and `/socket.io` requests to backend (`http://localhost:3001`). Backend URL can be configured with `NEXT_PUBLIC_BACKEND_URL` env variable. WebSocket upgrade handling is implemented for Socket.IO connections.
 
 ## Architecture
 
@@ -56,18 +69,19 @@ npm run clean                                     # Clean build artifacts
 
 ```
 backend/src/
-├── main.py                    # Flask app entry point
+├── main.py                    # Flask app entry point with Socket.IO
 ├── apis/                      # API blueprints
 │   ├── device_apis.py         # Device endpoints
 │   ├── script_apis.py         # Script endpoints
 │   ├── execution_apis.py      # Execution control
+│   ├── stream_apis.py         # Live screen streaming (Socket.IO)
 │   └── system_apis.py         # Health checks
 ├── libs/                      # Core libraries
 │   ├── device_manager.py      # Device discovery & tracking (Singleton)
 │   ├── execution_manager.py   # Script execution via subprocess
 │   ├── script_manager.py      # Script loading & management
 │   ├── storage_manager.py     # File-based persistence (Singleton)
-│   ├── adb_controller.py      # ADB command wrapper
+│   ├── adb_controller.py      # ADB wrapper using adbutils library
 │   └── image_controller.py    # OpenCV image matching
 ├── models/                    # Data models
 │   ├── device.py              # Device model
@@ -75,7 +89,8 @@ backend/src/
 │   ├── game_options.py        # Script options
 │   └── execution.py           # Running script model
 ├── scripts/                   # Automation scripts
-│   └── core.py                # Shared utilities (open_game, plant_tree, etc.)
+│   ├── core.py                # Shared utilities (open_game, plant_tree, etc.)
+│   └── .ignore                # Patterns to exclude from script discovery
 ├── data/                      # Runtime data
 │   ├── device_state.json      # Persisted device states
 │   └── logs/                  # Per-device log files
@@ -86,42 +101,49 @@ backend/src/
 
 1. **Singleton Managers**: `DeviceManager`, `StorageManager`, `ExecutionManager` use singleton pattern for shared state across requests
 2. **Subprocess Execution**: Scripts run as separate Python processes (not threads) for isolation
-3. **Background Threads**: Device discovery runs continuously, log capture runs per-execution
+3. **Background Threads**: Device discovery runs continuously, log capture runs per-execution, screen streaming runs per-session
 4. **File-based Storage**: Device state saved to JSON, logs saved to individual files per device
+5. **Socket.IO Integration**: Flask-SocketIO with threading mode for WebSocket communication (compatible with Python 3.13+)
+6. **Real-time Streaming**: H.264 video streaming via Socket.IO using `adb screenrecord` with NAL unit detection
 
 ### Frontend Structure (Next.js + React + TypeScript)
 
 ```
-frontend/src/
-├── app/
-│   ├── page.tsx              # Main page (home)
-│   ├── layout.tsx            # Root layout with metadata
-│   └── globals.css           # Global styles
-├── components/
-│   ├── DeviceDetailModal.tsx # Device details view
-│   ├── DeviceLogModal.tsx    # Real-time logs display
-│   ├── Modal.tsx             # Base modal component
-│   ├── MultiSelect.tsx       # Device multi-select
-│   └── SearchableSelect.tsx  # Script selector
-└── api.ts                     # API client (axios)
+frontend/
+├── server.ts                  # Custom Express server with proxy & WebSocket
+├── src/
+│   ├── app/
+│   │   ├── page.tsx           # Main page (home)
+│   │   ├── layout.tsx         # Root layout with metadata
+│   │   └── globals.css        # Global styles
+│   ├── components/
+│   │   ├── DeviceDetailModal.tsx  # Device details view
+│   │   ├── DeviceLogModal.tsx     # Real-time logs display
+│   │   ├── LiveScreenModal.tsx    # Live H.264 screen streaming
+│   │   ├── Modal.tsx              # Base modal component
+│   │   ├── MultiSelect.tsx        # Device multi-select
+│   │   └── SearchableSelect.tsx   # Script selector
+│   └── api.ts                 # API client (axios)
 ```
 
 - Uses **Next.js 14** (App Router)
 - **TanStack Query v4** for data fetching and caching
+- **Socket.IO Client** for WebSocket communication and live streaming
+- **Custom Express Server** (`server.ts`) handles API/WebSocket proxying to backend
 - State managed via React hooks and localStorage
 - Tailwind CSS for styling
-- API rewrites configured in `next.config.js`
+- **JMuxer** for H.264 video playback in browser
 
 ## Core System Flows
 
 ### Device Discovery & Management
 
 **DeviceManager** (`libs/device_manager.py`):
-- Runs background thread checking `adb devices` every 5 seconds
+- Runs background thread using adbutils to check connected devices every 5 seconds
 - Automatically creates `Device` objects for new devices
-- Persists device state (name, status, screen_size) to `data/device_state.json`
+- Persists device state (name, status, execution info) to `data/device_state.json`
 - Tracks device status: `available`, `busy`, `offline`
-- Fetches screen size via `adb shell wm size` and caches it
+- Uses adbutils `AdbClient.device_list()` for discovery
 
 **Device Serial to Name Mapping**:
 ```python
@@ -158,23 +180,33 @@ SERIAL_NAME_MAP = {
 
 **AdbController** (`libs/adb_controller.py`) provides:
 
+**Core Library**: Uses **adbutils 2.10.2** library for all ADB operations (wraps `AdbClient` and device objects)
+
+**Coordinate System**: All methods use **percentage-based coordinates (0.0-1.0)** for screen positions
+- Example: `tap(0.5, 0.5)` taps center of screen
+- Internally converts to pixel coordinates based on device screen size
+
 **Basic Commands**:
-- `tap(x, y)` - Tap at coordinates
-- `swipe(x1, y1, x2, y2, duration)` - Swipe gesture
-- `press_key(keycode)` - Press Android key (HOME, BACK, etc.)
+- `tap(x, y)` - Tap at percentage coordinates (0.0-1.0)
+- `swipe(x1, y1, x2, y2, duration)` - Swipe gesture with percentage coords
+- `press_key(keycode)` - Press Android key using KeyCode enum (HOME, BACK, etc.)
 - `open_app(package_name)` / `close_app(package_name)` - App control
+- `capture_screen()` - Screenshot as PNG bytes (uses adbutils built-in)
 
 **Image-based Automation**:
-- `find_image_on_screen(template_path, threshold=0.9)` - Returns (x, y) or None
-- `click_image(template_path)` - Find and click image
-- `click_text(target_text, lang="eng")` - OCR-based text clicking
+- `find_image_on_screen(template_path, threshold=0.9)` - Returns percentage coords (0.0-1.0) or raises IOError
+- `click_image(template_path)` - Find and click image, auto-retry up to 3 times
+- `click_text(target_text, lang="eng")` - OCR-based text clicking with Tesseract
 
 **Advanced Gestures**:
-- `drag(points)` - Multi-point drag using `sendevent` for precise control
-- Supports complex paths through coordinate lists
-- Uses device coordinate conversion (screen coords → touch device coords)
+- `drag(points)` - Multi-point drag using low-level `sendevent` commands
+- Points are percentage coordinates: `[(0.25, 0.78), (0.38, 0.83), ...]`
+- Converts to device coordinates (0-32767 range for BlueStacks Virtual Touch)
+- Default touch device: `/dev/input/event2`
 
-**Assets**: Image templates stored in `backend/assets/` directory
+**Assets**: Image templates stored in `backend/assets/` directory (supports subdirectories)
+
+**Error Handling**: `@retry_on_error` decorator retries failed operations up to 3 times with exponential backoff
 
 ## Writing Custom Scripts
 
@@ -292,18 +324,44 @@ class GameOptions:
 
 Passed from frontend to scripts as JSON argument.
 
+### Live Screen Streaming
+
+**Architecture** (`apis/stream_apis.py`):
+- Uses **Socket.IO** for real-time H.264 video streaming
+- Backend spawns `adb screenrecord` process per session
+- Streams raw H.264 data over WebSocket using NAL unit boundary detection
+- Frontend uses **JMuxer** library to decode and play H.264 in browser
+
+**Stream Configuration**:
+- Bit rate: 2.5 Mbps (balanced for live monitoring)
+- Format: H.264 raw stream (`--output-format=h264`)
+- Time limit: 3 minutes per session (auto-restarts if needed)
+- NAL unit detection: Splits stream at `0x00 0x00 0x00 0x01` boundaries
+
+**Socket.IO Events**:
+- `start_stream` - Client requests stream for device
+- `stream_data` - Server sends base64-encoded H.264 chunks
+- `stop_stream` - Client stops stream
+- `stream_error` / `stream_ended` - Status events
+
+**Implementation Details**:
+- Each session tracked in `active_streams` dict with stop flag
+- Background thread reads from adb connection and emits chunks
+- Buffer accumulates data until NAL boundary found
+- Automatic cleanup on disconnect or errors
+
 ### Multi-Touch & Gestures
 
 **Drag Implementation**:
 - Uses low-level `sendevent` commands for precise touch control
-- Converts screen coordinates to device coordinates (0-32767 range for BlueStacks)
+- Converts percentage coordinates to device coordinates (0-32767 range for BlueStacks)
 - Supports complex multi-point paths
 - Default touch device: `/dev/input/event2`
 
 **Example**:
 ```python
-# Drag item to multiple planting locations
-points = [(slot_x, slot_y), (720, 900), (890, 900), (1060, 900)]
+# Drag item to multiple planting locations (percentage coords)
+points = [(0.25, 0.78), (0.38, 0.83), (0.46, 0.83), (0.55, 0.83)]
 manager.drag(points)
 ```
 
@@ -336,6 +394,13 @@ manager.drag(points)
 - `POST /api/execute/stop` - Stop specific execution
   - Body: `{ execution_id }`
 - `POST /api/execute/stop-all` - Stop all running scripts
+
+### Streaming (Socket.IO)
+- `start_stream` event - Start live screen streaming for device
+  - Data: `{ device_id }`
+- `stop_stream` event - Stop current stream
+- `stream_data` event - Receive H.264 video chunks (base64-encoded)
+- `stream_started` / `stream_stopped` / `stream_error` / `stream_ended` - Status events
 
 ### System
 - `GET /health` - Health check endpoint
@@ -380,14 +445,58 @@ curl -X POST http://localhost:3001/api/execute/start \
 - Check image threshold (lower if needed)
 - Ensure screen resolution matches template expectations
 
+## Production Deployment
+
+### PM2 Process Management
+
+**Configuration** (`ecosystem.config.js`):
+- **Backend**: Runs via `poetry run gunicorn` on port 3001
+  - Worker timeout: 120 seconds
+  - Max memory restart: 1GB
+  - Logs: `logs/backend-{error,out}.log`
+- **Frontend**: Runs via `pnpm start` on port 3000
+  - Max memory restart: 500MB
+  - Logs: `logs/frontend-{error,out}.log`
+
+**Commands** (from project root):
+```bash
+pnpm prod         # Start all services with PM2
+pnpm prod:stop    # Stop all services
+pnpm prod:restart # Restart all services
+pnpm prod:logs    # View combined logs
+pnpm prod:status  # Check service status
+```
+
+**Important**: Frontend server uses custom Express server (`server.ts`) in production, not Next.js standalone. This ensures WebSocket proxying works correctly.
+
 ## Performance Considerations
 
 1. **Device Discovery**: Runs every 5 seconds - adjust if needed in `DeviceManager._start_discovery()`
 2. **Log Streaming**: Line-buffered subprocess output for real-time updates
-3. **Image Matching**: Max 3 retries with 0.5s delay - adjust `max_retries` parameter
+3. **Image Matching**: Max 3 retries with 0.5s delay via `@retry_on_error` decorator
 4. **File Locks**: StorageManager uses threading.Lock for thread-safe file operations
+5. **Video Streaming**: 2.5 Mbps H.264 with NAL-based chunking for low latency
+6. **Socket.IO**: Threading mode (async_mode='threading') for Python 3.13+ compatibility
 
 ## Important Notes
+
+### Backend Server Configuration
+
+**Flask-SocketIO Setup** (`main.py`):
+- Uses `async_mode='threading'` for Socket.IO compatibility with Python 3.13+
+- Alternative: `eventlet` mode has issues with newer Python versions
+- Server started via `socketio.run(app)` instead of `app.run()`
+- CORS enabled for all origins during development
+
+### Frontend Server Architecture
+
+**Custom Express Server** (`server.ts`):
+- **Required** for WebSocket proxying (Socket.IO) to backend
+- Standard Next.js server doesn't support WebSocket upgrade properly
+- Handles two separate proxy paths:
+  - `/api/*` - HTTP requests to backend REST API
+  - `/socket.io/*` - WebSocket connections for live streaming
+- Implements `upgrade` event handler for WebSocket handshake
 
 ### UI State Persistence
 
@@ -395,3 +504,11 @@ The frontend persists UI state to localStorage:
 - **Control Panel Expansion**: Saves Hide/Show state of control panel
 - Key: `'controlPanelExpanded'`
 - Implementation: `useState` initializer + `useEffect` hook in `app/page.tsx`
+
+### Coordinate System
+
+**All ADB operations use percentage-based coordinates (0.0-1.0)**:
+- Screen-agnostic: Works across different device resolutions
+- Example: `manager.tap(0.5, 0.5)` always taps center regardless of screen size
+- Conversion to pixels happens internally in `AdbController`
+- Drag gestures: `[(0.25, 0.78), (0.38, 0.83)]` instead of pixel coordinates

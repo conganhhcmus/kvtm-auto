@@ -76,27 +76,22 @@ const LiveScreenModal: React.FC<LiveScreenModalProps> = ({ isOpen, onClose, devi
             setError(null)
         }
 
-        const handleStreamData = (data: { chunk: string }) => {
+        const handleStreamData = (data: { chunk: ArrayBuffer }) => {
             // Check if we should still process chunks
             if (!isStreamingRef.current || !jmuxerRef.current) {
-                console.log('[LiveScreen] Stream not active or JMuxer not ready, ignoring chunk')
                 return
             }
 
-            // Decode base64 chunk to binary
+            // Handle binary or base64 data
             try {
-                const binaryString = atob(data.chunk)
-                const bytes = new Uint8Array(binaryString.length)
-                for (let i = 0; i < binaryString.length; i++) {
-                    bytes[i] = binaryString.charCodeAt(i)
-                }
+                const bytes: Uint8Array = new Uint8Array(data.chunk)
 
                 // Feed H.264 data directly to JMuxer
                 jmuxerRef.current.feed({
                     video: bytes
                 })
             } catch (err) {
-                console.error('[LiveScreen] Error decoding/feeding chunk:', err)
+                console.error('[LiveScreen] Error feeding chunk:', err)
             }
         }
 
@@ -159,13 +154,13 @@ const LiveScreenModal: React.FC<LiveScreenModalProps> = ({ isOpen, onClose, devi
         console.log('[LiveScreen] Initializing JMuxer...')
 
         try {
-            // Create JMuxer instance
+            // Create JMuxer instance with buffering for smoother playback
             const jmuxer = new JMuxer({
                 node: videoRef.current,
                 mode: 'video',
                 flushingTime: 0,
                 clearBuffer: true,
-                fps: 30,
+                fps: 20,
                 debug: false
             })
 
