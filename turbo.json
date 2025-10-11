@@ -1,33 +1,52 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "ui": "tui",
+  "globalEnv": ["NODE_ENV", "PORT"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**", "build/**"],
+      "inputs": ["src/**", "package.json", "tsconfig.json", "next.config.js", "pyproject.toml"],
       "env": ["NODE_ENV"]
     },
     "dev": {
       "dependsOn": ["^build"],
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "env": ["NODE_ENV", "PORT", "NEXT_PUBLIC_BACKEND_URL", "FLASK_ENV"]
+    },
+    "start": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "persistent": true,
+      "env": ["NODE_ENV", "PORT", "NEXT_PUBLIC_BACKEND_URL", "FLASK_ENV"]
     },
     "lint": {
       "dependsOn": ["^lint"],
-      "cache": true
+      "cache": true,
+      "inputs": ["src/**", ".eslintrc.json", "pyproject.toml"]
     },
     "format": {
-      "cache": false
+      "cache": false,
+      "inputs": ["src/**"]
+    },
+    "type-check": {
+      "dependsOn": ["^build"],
+      "cache": true,
+      "inputs": ["src/**", "tsconfig.json", "pyproject.toml"],
+      "outputs": ["*.tsbuildinfo"]
     },
     "test": {
       "dependsOn": ["^build"],
       "cache": true,
+      "inputs": ["src/**", "tests/**", "pyproject.toml"],
       "outputs": ["coverage/**"]
     },
     "prod": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["build"],
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "env": ["NODE_ENV", "PORT", "NEXT_PUBLIC_BACKEND_URL", "FLASK_ENV"]
     },
     "clean": {
       "cache": false

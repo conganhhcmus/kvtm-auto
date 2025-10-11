@@ -5,9 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 **KVTM Auto** is a full-stack Android device automation platform for automating mobile games via ADB (Android Debug Bridge). The system uses:
-- **Backend**: Flask + Flask-SocketIO (Python 3.9+) on port 3001 with WebSocket support
-- **Frontend**: Next.js 14 + React 18 + TypeScript on port 3000 with custom Express server
-- **Monorepo**: Turborepo with pnpm workspace management
+- **Server (Backend)**: Flask + Flask-SocketIO (Python 3.9+) on port 3001 with WebSocket support
+- **Client (Frontend)**: Next.js 14 + React 18 + TypeScript on port 3000 with custom Express server
+- **Monorepo**: Turborepo with pnpm workspace management (`apps/server` and `apps/client`)
 - **Core Technology**: adbutils for device control, OpenCV for image matching, Socket.IO for live streaming, subprocess for script execution
 
 ## Prerequisites
@@ -20,8 +20,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Android Device/Emulator** - With USB debugging enabled
 
 **Key Dependencies**:
-- **Backend**: adbutils 2.10.2, Flask 3.0+, OpenCV, Tesseract OCR
-- **Frontend**: Next.js 14, React 18, Socket.IO Client, JMuxer
+- **Server (Backend)**: adbutils 2.10.2, Flask 3.0+, OpenCV, Tesseract OCR
+- **Client (Frontend)**: Next.js 14, React 18, Socket.IO Client, JMuxer
 
 ## Development Commands
 
@@ -34,9 +34,9 @@ pnpm lint                                         # Lint all packages
 pnpm clean                                        # Clean all build artifacts
 ```
 
-### Backend Development
+### Server Development (Backend)
 ```bash
-cd backend
+cd apps/server
 poetry install                                    # Install dependencies
 poetry run python src/main.py --env dev          # Run dev server (port 3001, auto-reload)
 poetry run python src/main.py --env prod         # Run production server
@@ -49,9 +49,9 @@ poetry run mypy src/                             # Type checking
 poetry run pytest                                # Run tests
 ```
 
-### Frontend Development
+### Client Development (Frontend)
 ```bash
-cd frontend
+cd apps/client
 npm install                                       # Install dependencies
 npm run dev                                       # Next.js dev server (port 3000)
 npm run build                                     # Build for production
@@ -61,14 +61,14 @@ npm run format                                    # Fix linting issues
 npm run clean                                     # Clean build artifacts
 ```
 
-**Important**: Frontend uses custom Express server (`server.ts`) that proxies `/api` and `/socket.io` requests to backend (`http://localhost:3001`). Backend URL can be configured with `NEXT_PUBLIC_BACKEND_URL` env variable. WebSocket upgrade handling is implemented for Socket.IO connections.
+**Important**: Client uses custom Express server (`server.ts`) that proxies `/api` and `/socket.io` requests to server (`http://localhost:3001`). Server URL can be configured with `NEXT_PUBLIC_BACKEND_URL` env variable. WebSocket upgrade handling is implemented for Socket.IO connections.
 
 ## Architecture
 
-### Backend Structure (Flask + Blueprints)
+### Server Structure (Backend - Flask + Blueprints)
 
 ```
-backend/src/
+apps/server/src/
 ├── main.py                    # Flask app entry point with Socket.IO
 ├── apis/                      # API blueprints
 │   ├── device_apis.py         # Device endpoints
@@ -106,10 +106,10 @@ backend/src/
 5. **Socket.IO Integration**: Flask-SocketIO with threading mode for WebSocket communication (compatible with Python 3.13+)
 6. **Real-time Streaming**: H.264 video streaming via Socket.IO using `adb screenrecord` with NAL unit detection
 
-### Frontend Structure (Next.js + React + TypeScript)
+### Client Structure (Frontend - Next.js + React + TypeScript)
 
 ```
-frontend/
+apps/client/
 ├── server.ts                  # Custom Express server with proxy & WebSocket
 ├── src/
 │   ├── app/
@@ -204,7 +204,7 @@ SERIAL_NAME_MAP = {
 - Converts to device coordinates (0-32767 range for BlueStacks Virtual Touch)
 - Default touch device: `/dev/input/event2`
 
-**Assets**: Image templates stored in `backend/assets/` directory (supports subdirectories)
+**Assets**: Image templates stored in `apps/server/assets/` directory (supports subdirectories)
 
 **Error Handling**: `@retry_on_error` decorator retries failed operations up to 3 times with exponential backoff
 
@@ -212,14 +212,14 @@ SERIAL_NAME_MAP = {
 
 ### Script Structure
 
-Scripts must be placed in `backend/src/scripts/` and follow this pattern:
+Scripts must be placed in `apps/server/src/scripts/` and follow this pattern:
 
 ```python
 import json
 import sys
 import os
 
-# Add backend/src to path
+# Add apps/server/src to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from libs.adb_controller import AdbController
@@ -266,7 +266,7 @@ if __name__ == "__main__":
 ### Script Discovery
 
 **ScriptManager** automatically discovers scripts:
-- Scans `backend/src/scripts/` for `.py` files
+- Scans `apps/server/src/scripts/` for `.py` files
 - Excludes files matching patterns in `.ignore` file
 - Generates script ID from filename (e.g., `vai_tim.py` → `vai_tim`)
 - Generates display name by title-casing (e.g., `vai_tim` → `Vai Tim`)
@@ -300,7 +300,7 @@ Common automation functions available:
 **Log Format**: All logs timestamped with `[HH:MM:SS]: <message>` format
 
 **Storage**:
-- Logs saved to `backend/src/data/logs/<device_serial>.log`
+- Logs saved to `apps/server/src/data/logs/<device_serial>.log`
 - Thread-safe file operations via `StorageManager._file_lock`
 - `device.add_log(message)` - Append log
 - `device.get_logs(limit=100)` - Retrieve recent logs
@@ -368,7 +368,7 @@ manager.drag(points)
 ### Image Matching
 
 **OpenCV-based Detection**:
-- Templates stored in `backend/assets/` directory
+- Templates stored in `apps/server/assets/` directory
 - Default threshold: 0.9 (90% match)
 - Auto-retry up to 3 times with 0.5s delay
 - Returns center coordinates of matched region
@@ -411,12 +411,12 @@ manager.drag(points)
 
 **Direct Execution** (faster for development):
 ```bash
-cd backend
+cd apps/server
 poetry run python src/scripts/vai_tim.py emulator-5554 '{"open_game":true}'
 ```
 
 **Via API** (full integration test):
-1. Start backend: `poetry run python src/main.py --env dev`
+1. Start server: `cd apps/server && poetry run python src/main.py --env dev`
 2. Use frontend or curl:
 ```bash
 curl -X POST http://localhost:3001/api/execute/start \
@@ -433,7 +433,7 @@ curl -X POST http://localhost:3001/api/execute/start \
 **Devices Not Appearing**:
 - Check `adb devices` shows devices
 - Ensure USB debugging enabled
-- Check backend logs for discovery errors
+- Check server logs for discovery errors
 
 **Script Execution Fails**:
 - Check script has correct shebang and imports
@@ -450,13 +450,15 @@ curl -X POST http://localhost:3001/api/execute/start \
 ### PM2 Process Management
 
 **Configuration** (`ecosystem.config.js`):
-- **Backend**: Runs via `poetry run gunicorn` on port 3001
+- **Server (Backend)**: Runs via `poetry run gunicorn` on port 3001
+  - Working directory: `./apps/server/src`
   - Worker timeout: 120 seconds
   - Max memory restart: 1GB
-  - Logs: `logs/backend-{error,out}.log`
-- **Frontend**: Runs via `pnpm start` on port 3000
+  - Logs: `logs/server-{error,out}.log`
+- **Client (Frontend)**: Runs via `pnpm start` on port 3000
+  - Working directory: `./apps/client`
   - Max memory restart: 500MB
-  - Logs: `logs/frontend-{error,out}.log`
+  - Logs: `logs/client-{error,out}.log`
 
 **Commands** (from project root):
 ```bash
@@ -467,7 +469,7 @@ pnpm prod:logs    # View combined logs
 pnpm prod:status  # Check service status
 ```
 
-**Important**: Frontend server uses custom Express server (`server.ts`) in production, not Next.js standalone. This ensures WebSocket proxying works correctly.
+**Important**: Client server uses custom Express server (`server.ts`) in production, not Next.js standalone. This ensures WebSocket proxying works correctly.
 
 ## Performance Considerations
 
@@ -480,17 +482,17 @@ pnpm prod:status  # Check service status
 
 ## Important Notes
 
-### Backend Server Configuration
+### Server Configuration (Backend)
 
-**Flask-SocketIO Setup** (`main.py`):
+**Flask-SocketIO Setup** (`apps/server/src/main.py`):
 - Uses `async_mode='threading'` for Socket.IO compatibility with Python 3.13+
 - Alternative: `eventlet` mode has issues with newer Python versions
 - Server started via `socketio.run(app)` instead of `app.run()`
 - CORS enabled for all origins during development
 
-### Frontend Server Architecture
+### Client Server Architecture (Frontend)
 
-**Custom Express Server** (`server.ts`):
+**Custom Express Server** (`apps/client/server.ts`):
 - **Required** for WebSocket proxying (Socket.IO) to backend
 - Standard Next.js server doesn't support WebSocket upgrade properly
 - Handles two separate proxy paths:
@@ -500,10 +502,10 @@ pnpm prod:status  # Check service status
 
 ### UI State Persistence
 
-The frontend persists UI state to localStorage:
+The client persists UI state to localStorage:
 - **Control Panel Expansion**: Saves Hide/Show state of control panel
 - Key: `'controlPanelExpanded'`
-- Implementation: `useState` initializer + `useEffect` hook in `app/page.tsx`
+- Implementation: `useState` initializer + `useEffect` hook in `apps/client/src/app/page.tsx`
 
 ### Coordinate System
 

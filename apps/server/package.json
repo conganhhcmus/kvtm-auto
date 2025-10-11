@@ -1,0 +1,15 @@
+{
+  "name": "@kvtm-auto/server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "KVTM Auto - Server (Flask + Python)",
+  "scripts": {
+    "install": "poetry install",
+    "dev": "poetry run python src/main.py --env dev",
+    "build": "poetry install",
+    "start": "cd src && poetry run gunicorn -b 0.0.0.0:3001 --timeout 120 --access-logfile - --error-logfile - main:app",
+    "lint": "poetry run flake8 src/",
+    "format": "poetry run black src/ && poetry run isort src/",
+    "clean": "find . -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true"
+  }
+}
