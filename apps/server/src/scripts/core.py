@@ -48,7 +48,7 @@ sell_options = [
 def _close_all_popup(manager: AdbController, num=3):
     for _ in range(num):
         manager.press_key(KeyCode.BACK.value)
-        manager.sleep(0.2)
+        manager.sleep(0.25)
 
     manager.click_image("o-lai")
     manager.sleep(0.5)
@@ -80,7 +80,7 @@ def open_chest(manager: AdbController):
         manager.click_image("mo-ngay")
         for _ in range(10):
             manager.tap(0.5, 0.62)
-            manager.sleep(0.2)
+            manager.sleep(0.25)
         _close_all_popup(manager)
     manager.sleep(0.5)
 
@@ -153,12 +153,12 @@ def make_items(manager: AdbController, floor=1, slot=0, num=1):
 
     for _ in range(max(10, 2 * num)):
         manager.tap(*position)
-        manager.sleep(0.2)
+        manager.sleep(0.25)
 
     attempt = 5
     while attempt > 0 and not manager.find_image_on_screen("o-trong-san-xuat"):
         manager.tap(*position)
-        manager.sleep(0.2)
+        manager.sleep(0.25)
         attempt -= 1
 
     if attempt == 0:
@@ -166,7 +166,7 @@ def make_items(manager: AdbController, floor=1, slot=0, num=1):
 
     for _ in range(num):
         manager.drag([full_item_point[slot], (0.39, 0.42)])
-        manager.sleep(0.2)
+        manager.sleep(0.25)
 
     # fix & close
     if floor == 1:
@@ -228,9 +228,9 @@ def sell_items(manager: AdbController, option: SellOption, items):
         soldSlot = manager.find_image_on_screen("o-da-ban")
         if soldSlot:
             manager.tap(*soldSlot)
-            manager.sleep(0.2)
+            manager.sleep(0.25)
             manager.tap(*soldSlot)
-            manager.sleep(0.2)
+            manager.sleep(0.25)
             manager.tap(*choose_type)
             manager.sleep(0.5)
 

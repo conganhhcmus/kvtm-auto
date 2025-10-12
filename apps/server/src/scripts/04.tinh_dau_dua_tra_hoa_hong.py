@@ -23,7 +23,9 @@ from scripts.core import (
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python vai_tim.py <device_id> [game_options_json]")
+        print(
+            "Usage: python tinh_dau_dua_tra_hoa_hong.py <device_id> [game_options_json]"
+        )
         sys.exit(1)
 
     device_id = sys.argv[1]
@@ -44,42 +46,61 @@ def main():
         open_game(manager)
 
     for i in range(100):
-        print(f"{i}: Run vai tim")
+        print(f"{i}: Run tinh dau dua, tra hoa hong")
         if game_options.open_chest:
             open_chest(manager)
 
         for j in range(10):
-            isLast = j == 9
             # auto
+            isEven = j % 2 == 0
             go_up(manager)
-            plant_tree(manager, "oai-huong")
+            plant_tree(manager, "tuyet", next=False)
             go_up(manager, 2)
-            plant_tree(manager, "oai-huong")
-            go_down(manager, 2)
-            manager.sleep(6)
+            plant_tree(manager, "tuyet")
+            go_up(manager, 2)
+            plant_tree(manager, "tuyet")
+            go_down(manager, 4)
+
+            if isEven:
+                harvest_tree(manager)
+                plant_tree(manager, "hong")
+                go_up(manager, 2)
+                harvest_tree(manager)
+                plant_tree(manager, "hong")
+                go_up(manager, 2)
+                harvest_tree(manager)
+                plant_tree(manager, "hong")
+                go_down(manager, 4)
 
             harvest_tree(manager)
-            plant_tree(manager, "bong", next=False)
+            plant_tree(manager, "dua")
             go_up(manager, 2)
             harvest_tree(manager)
-            plant_tree(manager, "bong")
-            go_down(manager, 2)
+            plant_tree(manager, "dua")
+            go_up(manager, 2)
+            harvest_tree(manager)
+            plant_tree(manager, "dua", num=6)
+            go_down(manager, 4)
 
-            make_items(manager, 1, 2, 8)  # oai huong say
+            make_items(manager, 1, 0, 6)  # hoa hong say
+            make_items(manager, 2, 1, 3)  # nuoc tuyet
             harvest_tree(manager)
             go_up(manager, 2)
             harvest_tree(manager)
-            make_items(manager, 1, 2, 8)  # vai tim
+            go_up(manager, 2)
+            harvest_tree(manager)
+            make_items(manager, 1, 3, 6)  # tinh dau dua
+            make_items(manager, 2, 0, 3)  # tra hoa hong
             go_last(manager)
-
-            if not isLast:
-                manager.sleep(22)
 
         if game_options.sell_items:
             sell_items(
                 manager,
                 SellOption.GOODS,
-                [{"key": "vai-tim", "value": 8}],
+                [
+                    {"key": "tinh-dau-dua", "value": 6},
+                    {"key": "tra-hoa-hong", "value": 3},
+                ],
             )
 
         i += 1
