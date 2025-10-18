@@ -18,6 +18,7 @@ from scripts.core import (
     open_game,
     plant_tree,
     sell_items,
+    make_event,
 )
 
 
@@ -82,6 +83,7 @@ def main():
                 [{"key": "vai-tim", "value": 8}],
             )
 
+        make_event(manager)
         i += 1
 
     print("The automation completed")

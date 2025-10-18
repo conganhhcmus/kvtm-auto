@@ -18,6 +18,7 @@ from scripts.core import (
     open_game,
     plant_tree,
     sell_items,
+    make_event,
 )
 
 
@@ -53,6 +54,7 @@ def main():
         for j in range(10):
             # auto
             isEven = j % 2 == 0
+
             go_up(manager)
             plant_tree(manager, "tuyet", next=False)
             go_up(manager, 2)
@@ -103,6 +105,7 @@ def main():
                 ],
             )
 
+        make_event(manager)
         i += 1
 
     print("The automation completed")

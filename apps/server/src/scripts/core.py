@@ -85,6 +85,24 @@ def open_chest(manager: AdbController):
     manager.sleep(0.5)
 
 
+def make_event(manager: AdbController):
+    has_event = manager.click_image("event")
+    if has_event:
+        manager.sleep(2)
+        for _ in range(5):
+            manager.tap(0.17, 0.70)
+            manager.sleep(1)
+
+        points = [0.40, 0.26, 0.17, 0.62]
+        for _ in range(3):
+            manager.swipe(*points, duration=100)
+            manager.sleep(1)
+
+        _close_all_popup(manager)
+        manager.sleep(1)
+        _close_all_popup(manager)
+
+
 def go_up(manager: AdbController, times=1):
     points = [0.5, 0.5, 0.5, 0.9]
     for _ in range(times):
