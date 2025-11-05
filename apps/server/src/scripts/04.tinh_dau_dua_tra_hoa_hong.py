@@ -19,6 +19,7 @@ from scripts.core import (
     plant_tree,
     sell_items,
     make_event,
+    loop_num,
 )
 
 
@@ -46,7 +47,7 @@ def main():
     if game_options.open_game:
         open_game(manager)
 
-    for i in range(100):
+    for i in range(loop_num):
         print(f"{i}: Run tinh dau dua, tra hoa hong")
         if game_options.open_chest:
             open_chest(manager)
@@ -106,7 +107,6 @@ def main():
             )
 
         make_event(manager)
-        i += 1
 
     print("The automation completed")
 

@@ -44,6 +44,27 @@ sell_options = [
     (0.54, 0.84),  # Events
 ]
 
+sell_slot_point = [
+    (0.25, 0.37),  # slot 1
+    (0.41, 0.37),  # slot 2
+    (0.58, 0.37),  # slot 3
+    (0.74, 0.37),  # slot 4
+    (0.25, 0.76),  # slot 5
+    (0.41, 0.76),  # slot 6
+    (0.58, 0.76),  # slot 7
+    (0.74, 0.76),  # slot 8
+]
+
+friend_house_point = [
+    (0.75, 0.61),  # slot 1
+    (0.22, 0.61),  # slot 2
+    (0.38, 0.61),  # slot 3
+    (0.53, 0.61),  # slot 4
+    (0.68, 0.61),  # slot 5
+]
+
+loop_num = 1000
+
 
 def _close_all_popup(manager: AdbController, num=3):
     for _ in range(num):
@@ -284,6 +305,33 @@ def sell_items(manager: AdbController, option: SellOption, items):
             _roll_back_item(items, item)
             # recurse for remain items
             return sell_items(manager, option, items)
+
+    _close_all_popup(manager)
+
+
+def go_friend(manager: AdbController, slot=0):
+    if manager.click_image("nha-ban"):
+        manager.sleep(1)
+        manager.tap(*friend_house_point[slot])
+        manager.sleep(2)
+
+
+def go_home(manager: AdbController):
+    if manager.click_image("nha-minh"):
+        manager.sleep(2)
+
+
+def buy_8_slot(manager: AdbController):
+    # open market
+    manager.tap(0.68, 0.70)
+    manager.sleep(1)
+
+    for _ in range(2):
+        for point in sell_slot_point:
+            manager.tap(*point)
+            manager.sleep(0.1)
+            manager.tap(*point)
+            manager.sleep(0.1)
 
     _close_all_popup(manager)
 

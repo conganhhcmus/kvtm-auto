@@ -89,8 +89,6 @@ def main():
             harvest_tree(manager)
             go_last(manager)
 
-        i += 1
-
     print("The automation completed")
 
 
