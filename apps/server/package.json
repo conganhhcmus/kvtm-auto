@@ -7,7 +7,7 @@
     "install": "poetry install",
     "dev": "poetry run python src/main.py --env dev",
     "build": "poetry install",
-    "start": "cd src && poetry run gunicorn -b 0.0.0.0:3001 --timeout 120 --access-logfile - --error-logfile - main:app",
+    "start": "poetry run python src/main.py --env prod",
     "lint": "poetry run flake8 src/",
     "format": "poetry run black src/ && poetry run isort src/",
     "clean": "find . -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true"

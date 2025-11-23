@@ -3,8 +3,8 @@ module.exports = {
     {
       name: 'kvtm-server',
       cwd: './apps/server',
-      script: 'pnpm',
-      args: 'start',
+      script: 'poetry',
+      args: 'run python src/main.py --env prod',
       interpreter: 'none',
       env: {
         NODE_ENV: 'production',

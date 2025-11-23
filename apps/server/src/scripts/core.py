@@ -1,4 +1,5 @@
 from enum import IntEnum
+from random import randint
 
 from libs.adb_controller import AdbController, KeyCode
 
@@ -14,53 +15,69 @@ class SellOption(IntEnum):
 
 
 full_tree_point = [
-    (0.38, 0.83),  # 1
-    (0.46, 0.83),  # 2
-    (0.55, 0.83),  # 3
-    (0.64, 0.83),  # 4
-    (0.73, 0.83),  # 5
-    (0.82, 0.83),  # 6
-    (0.82, 0.37),  # 12
-    (0.73, 0.37),  # 11
-    (0.64, 0.37),  # 10
-    (0.55, 0.37),  # 9
-    (0.46, 0.37),  # 8
-    (0.38, 0.37),  # 7
+    # floor 1
+    (850, 1730),  # 1
+    (1015, 1730),  # 2
+    (1180, 1730),  # 3
+    (1345, 1730),  # 4
+    (1510, 1730),  # 5
+    (1675, 1730),  # 6
+    # floor 2
+    (1675, 1245),  # 12
+    (1510, 1245),  # 11
+    (1345, 1245),  # 10
+    (1180, 1245),  # 9
+    (1015, 1245),  # 8
+    (850, 1245),  # 7
+    # floor 3
+    (850, 770),  # 13
+    (1015, 770),  # 14
+    (1180, 770),  # 15
+    (1345, 770),  # 16
+    (1510, 770),  # 17
+    (1675, 770),  # 18
+    # floor 4
+    (1675, 290),  # 24
+    (1510, 290),  # 23
+    (1345, 290),  # 22
+    (1180, 290),  # 21
+    (1015, 290),  # 20
+    (850, 290),  # 19
 ]
 
 full_item_point = [
-    (0.46, 0.16),  # 1
-    (0.53, 0.16),  # 2
-    (0.60, 0.16),  # 3
-    (0.53, 0.30),  # 4
-    (0.60, 0.30),  # 5
+    (1000, 1000),  # 1
+    (1140, 1000),  # 2
+    (1280, 1000),  # 3
+    (1140, 1150),  # 4
+    (1280, 1150),  # 5
 ]
 
 sell_options = [
-    (0.54, 0.23),  # Trees
-    (0.54, 0.38),  # Goods
-    (0.54, 0.53),  # Others
-    (0.54, 0.69),  # Mineral
-    (0.54, 0.84),  # Events
+    (975, 650),  # Trees
+    (975, 800),  # Goods
+    (975, 950),  # Others
+    (975, 1100),  # Mineral
+    (975, 1250),  # Events
 ]
 
 sell_slot_point = [
-    (0.25, 0.37),  # slot 1
-    (0.41, 0.37),  # slot 2
-    (0.58, 0.37),  # slot 3
-    (0.74, 0.37),  # slot 4
-    (0.25, 0.76),  # slot 5
-    (0.41, 0.76),  # slot 6
-    (0.58, 0.76),  # slot 7
-    (0.74, 0.76),  # slot 8
+    (630, 790),  # slot 1
+    (920, 790),  # slot 2
+    (1210, 790),  # slot 3
+    (1500, 790),  # slot 4
+    (630, 1210),  # slot 5
+    (920, 1210),  # slot 6
+    (1210, 1210),  # slot 7
+    (1500, 1210),  # slot 8
 ]
 
 friend_house_point = [
-    (0.75, 0.61),  # slot 1
-    (0.22, 0.61),  # slot 2
-    (0.38, 0.61),  # slot 3
-    (0.53, 0.61),  # slot 4
-    (0.68, 0.61),  # slot 5
+    (590, 1470),  # slot 1
+    (860, 1470),  # slot 2
+    (1130, 1470),  # slot 3
+    (1400, 1470),  # slot 4
+    (1670, 1470),  # slot 5
 ]
 
 loop_num = 1000
@@ -71,7 +88,7 @@ def _close_all_popup(manager: AdbController, num=3):
         manager.press_key(KeyCode.BACK.value)
         manager.sleep(0.25)
 
-    manager.click_image("o-lai")
+    manager.tap(1240, 1150)
     manager.sleep(0.5)
 
 
@@ -83,6 +100,8 @@ def open_game(manager: AdbController):
     manager.close_app(game_package)
     manager.open_app(game_package)
     manager.sleep(10)
+    manager.tap(1600, 2020)
+    manager.sleep(1)
     manager.click_image("game")
     manager.sleep(10)
     _close_all_popup(manager, 15)
@@ -94,13 +113,16 @@ def open_chest(manager: AdbController):
 
     if isFound:
         print("Opening chests...")
-        manager.tap(0.35, 0.22)
+        manager.tap(810, 1040)
         manager.sleep(0.5)
-        manager.tap(0.35, 0.22)
-        manager.click_image("ruong-go")
-        manager.click_image("mo-ngay")
+        manager.tap(810, 1040)
+        manager.tap(570, 1240)
+        manager.tap(570, 1240)
+        manager.sleep(0.5)
+        manager.tap(1075, 1050)
+        manager.tap(1075, 1050)
         for _ in range(10):
-            manager.tap(0.5, 0.62)
+            manager.tap(1080, 1050)
             manager.sleep(0.25)
         _close_all_popup(manager)
     manager.sleep(0.5)
@@ -111,10 +133,10 @@ def make_event(manager: AdbController):
     if has_event:
         manager.sleep(2)
         for _ in range(5):
-            manager.tap(0.17, 0.70)
+            manager.tap(550, 1100)
             manager.sleep(1)
 
-        points = [0.40, 0.26, 0.17, 0.62]
+        points = [870, 690, 500, 1100]
         for _ in range(3):
             manager.swipe(*points, duration=100)
             manager.sleep(1)
@@ -125,16 +147,18 @@ def make_event(manager: AdbController):
 
 
 def go_up(manager: AdbController, times=1):
-    points = [0.5, 0.5, 0.5, 0.9]
+    points = [1160, 1050, 1160, 1700]
     for _ in range(times):
         manager.swipe(*points, duration=100)
+        manager.sleep(0.1)
     manager.sleep(0.5)
 
 
 def go_down(manager: AdbController, times=1):
-    points = [0.5, 0.5, 0.5, 0.1]
+    points = [1160, 1050, 1160, 400]
     for _ in range(times):
         manager.swipe(*points, duration=100)
+        manager.sleep(0.1)
     manager.sleep(0.5)
 
 
@@ -144,18 +168,18 @@ def go_last(manager: AdbController):
     manager.sleep(1)
 
 
-def plant_tree(manager: AdbController, tree=None, num=12, next=True):
+def plant_tree(manager: AdbController, tree=None, num=24, next=True):
     manager.tap(*full_tree_point[0])
     manager.sleep(0.5)
-    slot = (0.25, 0.78)
+    slot = (640, 1640)
     if tree:
         slot = manager.find_image_on_screen(f"cay/{tree}")
         attempt = 5
         while not slot and attempt > 0:
             if next:
-                manager.tap(0.40, 0.68)
+                manager.tap(905, 1530)
             else:
-                manager.tap(0.10, 0.68)
+                manager.tap(360, 1530)
             manager.sleep(0.5)
             slot = manager.find_image_on_screen(f"cay/{tree}")
             attempt -= 1
@@ -168,7 +192,7 @@ def plant_tree(manager: AdbController, tree=None, num=12, next=True):
     manager.sleep(0.5)
 
 
-def harvest_tree(manager: AdbController):
+def harvest_tree(manager: AdbController, num=24):
     manager.tap(*full_tree_point[0])
     manager.sleep(0.5)
     slot = manager.find_image_on_screen("thu-hoach")
@@ -182,13 +206,13 @@ def harvest_tree(manager: AdbController):
     if not slot:
         raise LookupError("Image not found")
 
-    points = [slot, *full_tree_point]
+    points = [slot, *full_tree_point[:num]]
     manager.drag(points)
     manager.sleep(0.5)
 
 
 def make_items(manager: AdbController, floor=1, slot=0, num=1):
-    position = (0.22, 0.83) if floor == 1 else (0.22, 0.37)
+    position = (560, 1700) if floor == 1 else (560, 1220)
 
     for _ in range(max(10, 2 * num)):
         manager.tap(*position)
@@ -204,16 +228,16 @@ def make_items(manager: AdbController, floor=1, slot=0, num=1):
         raise LookupError("Image not found")
 
     for _ in range(num):
-        manager.drag([full_item_point[slot], (0.39, 0.42)])
+        manager.drag([full_item_point[slot], (860, 1260)])
         manager.sleep(0.25)
 
     # fix & close
     if floor == 1:
-        manager.tap(0.10, 0.70)
+        manager.tap(360, 1550)
     else:
-        manager.tap(0.10, 0.25)
+        manager.tap(360, 1090)
     manager.sleep(0.1)
-    manager.tap(0.79, 0.71)
+    manager.tap(1600, 1140)
     manager.sleep(0.1)
     _close_all_popup(manager)
 
@@ -253,12 +277,12 @@ def sell_items(manager: AdbController, option: SellOption, items):
     count = 0
 
     # open market
-    manager.tap(0.68, 0.70)
+    manager.tap(1375, 1530)
     manager.sleep(1)
 
     # back front market
     for _ in range(2):
-        manager.swipe(0.16, 0.60, 0.79, 0.60, 300)
+        manager.swipe(500, 1000, 1650, 1000, 300)
         manager.sleep(0.5)
 
     # buy item
@@ -290,15 +314,15 @@ def sell_items(manager: AdbController, option: SellOption, items):
             continue
 
         # move next
-        manager.swipe(0.84, 0.60, 0.22, 0.60, 3000)
+        manager.swipe(1650, 1000, 500, 1000, 3000)
         manager.sleep(0.5)
         count += 1
         if count > 2:
-            manager.tap(0.26, 0.37)
+            manager.tap(*sell_slot_point[randint(0, 3)])
             manager.sleep(0.5)
-            manager.tap(0.50, 0.94)
+            manager.tap(1080, 1360)
             manager.sleep(0.5)
-            manager.tap(0.63, 0.08)
+            manager.tap(1310, 500)
             manager.sleep(0.5)
 
             _close_all_popup(manager)
@@ -323,7 +347,7 @@ def go_home(manager: AdbController):
 
 def buy_8_slot(manager: AdbController):
     # open market
-    manager.tap(0.68, 0.70)
+    manager.tap(1375, 1530)
     manager.sleep(1)
 
     for _ in range(2):
@@ -341,26 +365,26 @@ def _sell(manager: AdbController, setAds=True):
 
     # increase price
     for _ in range(10):
-        manager.tap(0.83, 0.60)
+        manager.tap(1835, 1020)
         manager.sleep(0.01)
 
     manager.sleep(0.5)
 
     if not setAds:
-        manager.tap(0.74, 0.79)
+        manager.tap(1685, 1220)
         manager.sleep(0.5)
         # sell
-        manager.tap(0.74, 0.91)
+        manager.tap(1685, 1330)
         manager.sleep(0.5)
-        manager.tap(0.63, 0.08)
+        manager.tap(1310, 500)
         manager.sleep(0.5)
     else:
         # sell
-        manager.tap(0.74, 0.91)
+        manager.tap(1685, 1330)
         manager.sleep(0.5)
-        manager.tap(0.50, 0.94)
+        manager.tap(1080, 1360)
         manager.sleep(0.5)
-        manager.tap(0.63, 0.08)
+        manager.tap(1310, 500)
         manager.sleep(0.5)
 
 

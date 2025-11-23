@@ -44,4 +44,15 @@ if __name__ == "__main__":
     if args.env == "dev":
         socketio.run(app, host="0.0.0.0", port=3001, debug=True)  # auto reload
     else:
-        socketio.run(app, host="0.0.0.0", port=3001, debug=False)  # no reload
+        # Production mode - use socketio.run with production settings
+        print("Starting KVTM Auto Server in production mode...")
+        print("Server will be available at http://0.0.0.0:3001")
+        socketio.run(
+            app,
+            host="0.0.0.0",
+            port=3001,
+            debug=False,
+            use_reloader=False,
+            log_output=True,
+            allow_unsafe_werkzeug=True  # Required for Flask-SocketIO threading mode
+        )

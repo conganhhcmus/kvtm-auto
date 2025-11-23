@@ -56,7 +56,12 @@ class DeviceManager:
             self._stop_discovery_flag.clear()
 
         def discover():
-            adb = AdbClient(host="127.0.0.1", port=5037)
+            try:
+                adb = AdbClient(host="127.0.0.1", port=5037)
+            except Exception as e:
+                print(f"[DeviceManager] Failed to connect to ADB server: {e}")
+                print("[DeviceManager] Please ensure ADB is installed and running")
+                return
 
             while not self._stop_discovery_flag.is_set():
                 changed = False  # Track if any state changed this cycle

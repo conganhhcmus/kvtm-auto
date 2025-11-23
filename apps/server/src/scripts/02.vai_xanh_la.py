@@ -50,28 +50,28 @@ def main():
         if game_options.open_chest:
             open_chest(manager)
 
-        for _ in range(10):
+        for j in range(10):
+            isLast = j == 9
             # auto
             go_up(manager)
             plant_tree(manager, "chanh")
-            go_up(manager, 2)
-            plant_tree(manager, "chanh")
-            go_down(manager, 2)
+            go_last(manager)
             manager.sleep(6)
 
+            go_up(manager)
             harvest_tree(manager)
-            plant_tree(manager, "bong", next=False)
-            go_up(manager, 2)
-            harvest_tree(manager)
-            plant_tree(manager, "bong", 6)
-            go_down(manager, 2)
+            plant_tree(manager, "bong", num=18, next=False)
+            go_last(manager)
 
+            go_up(manager)
             make_items(manager, 2, 3, 6)
             harvest_tree(manager)
             go_up(manager, 2)
-            harvest_tree(manager)
             make_items(manager, 1, 3, 6)
             go_last(manager)
+
+            # if not isLast:
+            #     manager.sleep(10)
 
         if game_options.sell_items:
             sell_items(

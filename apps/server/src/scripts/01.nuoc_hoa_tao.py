@@ -55,41 +55,27 @@ def main():
             # auto
             go_up(manager)
             plant_tree(manager, "tao")
-            go_up(manager, 2)
+            go_up(manager, 4)
             plant_tree(manager, "tao")
-            go_up(manager, 2)
-            plant_tree(manager, "tao")
-            go_up(manager, 2)
-            plant_tree(manager, "tao")
-            go_down(manager, 6)
-
+            go_last(manager)
+            manager.sleep(1)
+            go_up(manager)
             if isEven:
                 harvest_tree(manager)
-                plant_tree(manager, "tao")
-                go_up(manager, 2)
+                plant_tree(manager, "tao", num=12)
+                go_up(manager, 4)
 
             harvest_tree(manager)
             plant_tree(manager, "tuyet")
-            go_up(manager, 2)
-            harvest_tree(manager)
-            plant_tree(manager, "tuyet")
-            go_up(manager, 2)
-            harvest_tree(manager)
+            go_last(manager)
 
             if not isEven:
-                go_up(manager, 2)
-                harvest_tree(manager)
-
-            go_down(manager, 6)
-
+                manager.sleep(7)
+            go_up(manager)
             harvest_tree(manager)
             make_items(manager, 2, 0, 6)  # nuoc tao
-            go_up(manager, 2)
+            go_up(manager, 4)
             harvest_tree(manager)
-            go_up(manager, 2)
-            if isEven:
-                harvest_tree(manager)
-
             make_items(manager, 1, 1, 6)  # tinh dau tao
             go_up(manager, 2)
             make_items(manager, 2, 1, 6)  # nuoc hoa tao

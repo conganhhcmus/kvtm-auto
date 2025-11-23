@@ -122,7 +122,7 @@ class AdbController:
             return width, height
         except Exception:
             # Default fallback values
-            return 1080, 1920
+            return 2160, 1858
 
     def _resolve_asset_path(self, image_path):
         """Resolve asset path. If just filename, prepend assets directory."""
@@ -135,6 +135,9 @@ class AdbController:
 
     def _convert_to_device_coords(self, screen_x, screen_y):
         """Convert percentage coordinates (0.0-1.0) to device coordinates for BlueStacks Virtual Touch"""
+        if screen_x >= 1 or screen_y >= 1:
+            screen_x, screen_y = self._pixel_to_percent(screen_x, screen_y)
+
         device_x = int(screen_x * self.device_max_x)
         device_y = int(screen_y * self.device_max_y)
         return device_x, device_y

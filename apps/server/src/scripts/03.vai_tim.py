@@ -55,27 +55,23 @@ def main():
             # auto
             go_up(manager)
             plant_tree(manager, "oai-huong")
-            go_up(manager, 2)
-            plant_tree(manager, "oai-huong")
-            go_down(manager, 2)
-            manager.sleep(6)
+            go_last(manager)
+            manager.sleep(7)
 
+            go_up(manager)
             harvest_tree(manager)
             plant_tree(manager, "bong", next=False)
-            go_up(manager, 2)
-            harvest_tree(manager)
-            plant_tree(manager, "bong")
-            go_down(manager, 2)
+            go_last(manager)
 
+            go_up(manager)
             make_items(manager, 1, 2, 8)  # oai huong say
             harvest_tree(manager)
             go_up(manager, 2)
-            harvest_tree(manager)
             make_items(manager, 1, 2, 8)  # vai tim
             go_last(manager)
 
             if not isLast:
-                manager.sleep(22)
+                manager.sleep(24)
 
         if game_options.sell_items:
             sell_items(
