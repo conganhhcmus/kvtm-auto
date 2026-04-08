@@ -1,3 +1,11 @@
+# .NET
+api/bin/
+api/obj/
+release/
+
+# Vite build output (served by .NET)
+api/wwwroot/
+
 # Dependencies
 node_modules/
 npm-debug.log*
@@ -18,27 +26,6 @@ build/
 .env.development.local
 .env.test.local
 .env.production.local
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-.venv/
-
-# Poetry
-poetry.lock
-
-# FastAPI/Uvicorn
-.pytest_cache/
-.coverage
-htmlcov/
 
 # IDEs
 .vscode/
