@@ -20,7 +20,10 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
           <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-medium text-gray-900">{title}</h3>
-              <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+              <button
+                onClick={onClose}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
                 <X className="w-6 h-6" />
               </button>
             </div>

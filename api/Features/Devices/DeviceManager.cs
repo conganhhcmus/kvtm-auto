@@ -1,6 +1,6 @@
-using KvtmAuto.Infrastructure.Database;
-using KvtmAuto.Hubs;
 using KvtmAuto.Core.Models;
+using KvtmAuto.Hubs;
+using KvtmAuto.Infrastructure.Database;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 

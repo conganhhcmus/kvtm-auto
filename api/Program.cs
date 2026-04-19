@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using KvtmAuto.Features.Devices;
 using KvtmAuto.Features.Execution;
 using KvtmAuto.Features.Scripts;
@@ -6,8 +8,6 @@ using KvtmAuto.Infrastructure.Database;
 using KvtmAuto.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()

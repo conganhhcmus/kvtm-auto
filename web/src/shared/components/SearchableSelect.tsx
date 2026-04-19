@@ -16,7 +16,13 @@ interface SearchableSelectProps {
   label?: string
 }
 
-export default function SearchableSelect({ options, value, onChange, placeholder = 'Select option...', label }: SearchableSelectProps) {
+export default function SearchableSelect({
+  options,
+  value,
+  onChange,
+  placeholder = 'Select option...',
+  label,
+}: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -57,14 +63,18 @@ export default function SearchableSelect({ options, value, onChange, placeholder
         <span className={`flex items-center ${selectedOption ? 'text-gray-900' : 'text-gray-500'}`}>
           {selectedOption ? (
             <>
-              {selectedOption.recommend && <Star className="w-4 h-4 text-amber-400 mr-2 fill-current" />}
+              {selectedOption.recommend && (
+                <Star className="w-4 h-4 text-amber-400 mr-2 fill-current" />
+              )}
               {selectedOption.label}
             </>
           ) : (
             placeholder
           )}
         </span>
-        <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown
+          className={`w-5 h-5 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+        />
       </button>
 
       {isOpen && (
@@ -91,10 +101,14 @@ export default function SearchableSelect({ options, value, onChange, placeholder
                   className={`w-full text-left px-3 py-2 hover:bg-blue-50 focus:bg-blue-50 transition-colors ${value === option.value ? 'bg-blue-100 text-blue-900' : 'text-gray-900'}`}
                 >
                   <div className="font-medium text-sm flex items-center">
-                    {option.recommend && <Star className="w-4 h-4 text-amber-400 mr-2 fill-current" />}
+                    {option.recommend && (
+                      <Star className="w-4 h-4 text-amber-400 mr-2 fill-current" />
+                    )}
                     {option.label}
                   </div>
-                  {option.description && <div className="text-xs text-gray-500 mt-1">{option.description}</div>}
+                  {option.description && (
+                    <div className="text-xs text-gray-500 mt-1">{option.description}</div>
+                  )}
                 </button>
               ))
             ) : (

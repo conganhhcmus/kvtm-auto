@@ -1,6 +1,6 @@
+using System.Text.Json;
 using KvtmAuto.Core.Models;
 using Microsoft.EntityFrameworkCore;
-using System.Text.Json;
 
 namespace KvtmAuto.Infrastructure.Database;
 

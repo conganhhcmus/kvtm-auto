@@ -82,7 +82,13 @@ export default function MultiSelect({
               >
                 {option.label}
                 {!option.disabled && (
-                  <button onClick={(e) => { e.stopPropagation(); removeValue(option.value) }} className="ml-1 hover:text-blue-600">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      removeValue(option.value)
+                    }}
+                    className="ml-1 hover:text-blue-600"
+                  >
                     <X className="w-3 h-3" />
                   </button>
                 )}
@@ -90,14 +96,19 @@ export default function MultiSelect({
             ))
           ) : (
             <span className="text-gray-900">
-              {selectedOptions.slice(0, maxDisplayCount).map((opt) => opt.label).join(', ')}
+              {selectedOptions
+                .slice(0, maxDisplayCount)
+                .map((opt) => opt.label)
+                .join(', ')}
               <span className="ml-1 px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-md">
                 +{selectedOptions.length - maxDisplayCount} more
               </span>
             </span>
           )}
         </div>
-        <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown
+          className={`w-5 h-5 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+        />
       </button>
 
       {isOpen && (
@@ -120,14 +131,18 @@ export default function MultiSelect({
             <div className="p-2 border-b border-gray-100">
               <button
                 onClick={() => {
-                  const enabledValues = filteredOptions.filter((opt) => !opt.disabled).map((opt) => opt.value)
+                  const enabledValues = filteredOptions
+                    .filter((opt) => !opt.disabled)
+                    .map((opt) => opt.value)
                   const hasAll = enabledValues.every((val) => values.includes(val))
                   if (hasAll) onChange(values.filter((v) => !enabledValues.includes(v)))
                   else onChange([...new Set([...values, ...enabledValues])])
                 }}
                 className="w-full text-left px-2 py-1 text-sm text-blue-600 hover:text-blue-800 font-medium"
               >
-                {filteredOptions.filter((opt) => !opt.disabled).every((opt) => values.includes(opt.value))
+                {filteredOptions
+                  .filter((opt) => !opt.disabled)
+                  .every((opt) => values.includes(opt.value))
                   ? 'Deselect All Available'
                   : 'Select All Available'}
               </button>
@@ -145,12 +160,24 @@ export default function MultiSelect({
                     disabled={option.disabled}
                     className={`w-full text-left px-3 py-2 transition-colors flex items-center ${option.disabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-blue-50 focus:bg-blue-50'} ${isSelected && !option.disabled ? 'bg-blue-50' : ''}`}
                   >
-                    <div className={`w-4 h-4 border-2 rounded mr-3 flex items-center justify-center ${isSelected ? (option.disabled ? 'bg-gray-400 border-gray-400 text-white' : 'bg-blue-500 border-blue-500 text-white') : option.disabled ? 'border-gray-200' : 'border-gray-300'}`}>
+                    <div
+                      className={`w-4 h-4 border-2 rounded mr-3 flex items-center justify-center ${isSelected ? (option.disabled ? 'bg-gray-400 border-gray-400 text-white' : 'bg-blue-500 border-blue-500 text-white') : option.disabled ? 'border-gray-200' : 'border-gray-300'}`}
+                    >
                       {isSelected && <Check className="w-3 h-3" />}
                     </div>
                     <div className="flex-1">
-                      <div className={`font-medium text-sm ${option.disabled ? 'text-gray-400' : 'text-gray-900'}`}>{option.label}</div>
-                      {option.description && <div className={`text-xs mt-1 ${option.disabled ? 'text-gray-300' : 'text-gray-500'}`}>{option.description}</div>}
+                      <div
+                        className={`font-medium text-sm ${option.disabled ? 'text-gray-400' : 'text-gray-900'}`}
+                      >
+                        {option.label}
+                      </div>
+                      {option.description && (
+                        <div
+                          className={`text-xs mt-1 ${option.disabled ? 'text-gray-300' : 'text-gray-500'}`}
+                        >
+                          {option.description}
+                        </div>
+                      )}
                     </div>
                   </button>
                 )

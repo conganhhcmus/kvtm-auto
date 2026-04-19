@@ -5,8 +5,15 @@ import type { GameOptions } from './types'
 export function useStartExecution() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ deviceId, scriptId, options }: { deviceId: string; scriptId: string; options: GameOptions }) =>
-      executionApi.start(deviceId, scriptId, options),
+    mutationFn: ({
+      deviceId,
+      scriptId,
+      options,
+    }: {
+      deviceId: string
+      scriptId: string
+      options: GameOptions
+    }) => executionApi.start(deviceId, scriptId, options),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['devices'] }),
   })
 }

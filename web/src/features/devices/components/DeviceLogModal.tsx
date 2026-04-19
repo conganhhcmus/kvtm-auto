@@ -16,26 +16,29 @@ const DeviceLogModal: React.FC<DeviceLogModalProps> = ({ isOpen, onClose, device
   const [isLoading, setIsLoading] = useState(false)
   const [isConnected, setIsConnected] = useState(false)
 
-  const loadLogsAndSubscribe = useCallback(async (signal: AbortSignal) => {
-    setIsLoading(true)
-    try {
-      const conn = getLogConnection()
-      await startLogConnection()
-      if (signal.aborted) return
+  const loadLogsAndSubscribe = useCallback(
+    async (signal: AbortSignal) => {
+      setIsLoading(true)
+      try {
+        const conn = getLogConnection()
+        await startLogConnection()
+        if (signal.aborted) return
 
-      setIsConnected(true)
+        setIsConnected(true)
 
-      const history: string[] = await conn.invoke('GetLogs', deviceId)
-      if (signal.aborted) return
-      setLogs(history)
+        const history: string[] = await conn.invoke('GetLogs', deviceId)
+        if (signal.aborted) return
+        setLogs(history)
 
-      await conn.invoke('SubscribeLogs', deviceId)
-    } catch {
-      // connection failed — logs will be empty
-    } finally {
-      setIsLoading(false)
-    }
-  }, [deviceId])
+        await conn.invoke('SubscribeLogs', deviceId)
+      } catch {
+        // connection failed — logs will be empty
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [deviceId]
+  )
 
   useEffect(() => {
     if (!isOpen || !deviceId) return
@@ -45,7 +48,7 @@ const DeviceLogModal: React.FC<DeviceLogModalProps> = ({ isOpen, onClose, device
     const conn = getLogConnection()
 
     const onReceiveLog = (entry: string) => {
-      setLogs(prev => [...prev, entry])
+      setLogs((prev) => [...prev, entry])
     }
 
     conn.on('ReceiveLog', onReceiveLog)
@@ -133,14 +136,18 @@ const DeviceLogModal: React.FC<DeviceLogModalProps> = ({ isOpen, onClose, device
           ) : (
             <div className="space-y-1">
               {logs.map((line, i) => (
-                <div key={i} className={`leading-relaxed ${getLogColor(line)}`}>{line}</div>
+                <div key={i} className={`leading-relaxed ${getLogColor(line)}`}>
+                  {line}
+                </div>
               ))}
             </div>
           )}
         </div>
 
         <div className="text-xs text-gray-500 pt-2 border-t flex items-center space-x-1">
-          <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-gray-400'}`} />
+          <span
+            className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-gray-400'}`}
+          />
           <span>{isConnected ? 'Live via SignalR' : 'Disconnected'}</span>
         </div>
       </div>

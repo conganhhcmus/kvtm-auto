@@ -12,7 +12,11 @@ interface DeviceDetailModalProps {
 }
 
 const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, onClose, deviceId }) => {
-  const { data: device, isLoading, error } = useQuery({
+  const {
+    data: device,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ['device-detail', deviceId],
     queryFn: () => deviceApi.getDevice(deviceId),
     enabled: isOpen && !!deviceId,
@@ -28,7 +32,9 @@ const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, onClose, 
     <Modal isOpen={isOpen} onClose={onClose} title="Device Details">
       <div>
         {isLoading && <div className="text-center py-8">Loading device details...</div>}
-        {!!error && <div className="text-red-600 text-center py-8">Error loading device details</div>}
+        {!!error && (
+          <div className="text-red-600 text-center py-8">Error loading device details</div>
+        )}
         {device && (
           <div className="space-y-6">
             <div className="flex items-center space-x-4">
@@ -36,7 +42,9 @@ const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, onClose, 
               <div>
                 <h3 className="text-xl font-bold text-gray-900">{device.name}</h3>
                 <p className="text-gray-600">{`Device ${device.id}`}</p>
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${device.status === 'busy' ? 'text-green-600 bg-green-100' : device.status === 'online' ? 'text-blue-600 bg-blue-100' : 'text-gray-600 bg-gray-100'}`}>
+                <span
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${device.status === 'busy' ? 'text-green-600 bg-green-100' : device.status === 'online' ? 'text-blue-600 bg-blue-100' : 'text-gray-600 bg-gray-100'}`}
+                >
                   {device.status}
                 </span>
               </div>
@@ -78,7 +86,9 @@ const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, onClose, 
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Script:</span>
-                    <span className="font-medium">{script?.name ?? device.current_script_id ?? 'None'}</span>
+                    <span className="font-medium">
+                      {script?.name ?? device.current_script_id ?? 'None'}
+                    </span>
                   </div>
                 </div>
               </div>

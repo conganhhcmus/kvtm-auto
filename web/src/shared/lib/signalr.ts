@@ -48,6 +48,6 @@ async function ensureConnected(conn: signalR.HubConnection): Promise<void> {
   const deadline = Date.now() + 10_000
   while ((conn.state as signalR.HubConnectionState) !== signalR.HubConnectionState.Connected) {
     if (Date.now() > deadline) throw new Error('SignalR connection timed out')
-    await new Promise(resolve => setTimeout(resolve, 100))
+    await new Promise((resolve) => setTimeout(resolve, 100))
   }
 }

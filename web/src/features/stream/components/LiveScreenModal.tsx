@@ -14,7 +14,12 @@ interface LiveScreenModalProps {
   deviceName: string
 }
 
-const LiveScreenModal: React.FC<LiveScreenModalProps> = ({ isOpen, onClose, deviceId, deviceName }) => {
+const LiveScreenModal: React.FC<LiveScreenModalProps> = ({
+  isOpen,
+  onClose,
+  deviceId,
+  deviceName,
+}) => {
   const [isConnected, setIsConnected] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -170,7 +175,7 @@ const LiveScreenModal: React.FC<LiveScreenModalProps> = ({ isOpen, onClose, devi
         flushingTime: 0,
         clearBuffer: true,
         fps: 20,
-        debug: false
+        debug: false,
       })
 
       jmuxerRef.current = jmuxer
